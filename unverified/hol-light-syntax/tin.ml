@@ -79,6 +79,8 @@ and exp_of e =
       Exp_int i
   | Texp_constant (Asttypes.Const_string s) ->
       Exp_string s
+  | Texp_constant (Asttypes.Const_char c) ->
+      Exp_char c
   | Texp_function (_,pl,_) ->
       Exp_function (gcases_of pl)
   | Texp_apply (e,el) ->

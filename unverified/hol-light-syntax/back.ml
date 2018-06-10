@@ -71,6 +71,7 @@ let rec ocaml_print_texp (_,e) =
       let s = string_of_int i in
       ocaml_print (if i >= 0 then s else ("("^s^")"))
   | Exp_string s -> ocaml_print ("\""^String.escaped s^"\"")
+  | Exp_char c -> ocaml_print ("'" ^ String.make 1 c ^ "'")
   | Exp_construct ("::",el) ->
      (if is_exp_list e then ocaml_print_exp_list "[" e else
       match el with

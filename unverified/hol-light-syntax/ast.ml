@@ -13,6 +13,7 @@ type ml_exp =
 | Exp_qual_ident of string * string
 | Exp_int of int
 | Exp_string of string
+| Exp_char of char
 | Exp_construct of string * ml_texp list
 | Exp_tuple of ml_texp list
 | Exp_apply of ml_texp * ml_texp list

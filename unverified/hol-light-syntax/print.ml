@@ -143,6 +143,7 @@ let rec sml_print_texp (_,e) =
       if i >= 0 then sml_print (string_of_int i)
       else sml_print ("(~"^string_of_int (-i)^")")
   | Exp_string s -> sml_print ("\""^String.escaped s^"\"")
+  | Exp_char c -> sml_print ("#\"" ^ String.make 1 c ^ "\"")
   | Exp_construct ("::",el) ->
      (if is_exp_list e then sml_print_exp_list "[" e else
       match el with
