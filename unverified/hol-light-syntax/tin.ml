@@ -141,7 +141,7 @@ and pat_of p =
   | Tpat_alias (p,i,_) ->
       Pat_alias (tpat_of p,string_of_ident i)
   | _ -> raise (Unknown_pat p)
-  
+
 and cases_of pl =
   List.map (fun (p,e) -> (tpat_of p,texp_of e)) pl
 
@@ -194,7 +194,7 @@ let rec str_item_of s =
   match s.str_desc with
   | Tstr_eval e ->
       Str_eval (texp_of e)
-  | Tstr_value (r,pl) -> 
+  | Tstr_value (r,pl) ->
       Str_value (rec_of r,vcases_of pl)
   | Tstr_type tl ->
       let tl' = List.map
@@ -212,11 +212,16 @@ let rec str_item_of s =
       Str_exception (string_of_ident i,List.map typ_of tl)
   | Tstr_modtype (i,_,{mty_desc = Tmty_signature {sig_items = sl}}) ->
       Str_modtype (string_of_ident i,List.map sig_item_of sl)
+      (* TODO Modules *)
   | Tstr_module (i,_,{mod_desc = Tmod_constraint
         ({mod_desc = Tmod_structure {str_items = sl}},
          Types.Mty_ident (Path.Pident i'),_,_)}) ->
       Str_module (string_of_ident i,string_of_ident i',
         List.map str_item_of sl)
+  | Tstr_module (i,_,{mod_desc = Tmod_structure ({str_items = si})}) ->
+      print_string "(found module, skipping) ...";
+      Str_value (false, [])
+      (* ------------ *)
   | Tstr_include ({mod_desc = Tmod_ident (Path.Pident i,_)},_) ->
       Str_include (string_of_ident i)
   | s' -> raise (Unknown_str_item s');;
