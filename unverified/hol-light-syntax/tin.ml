@@ -212,16 +212,13 @@ let rec str_item_of s =
       Str_exception (string_of_ident i,List.map typ_of tl)
   | Tstr_modtype (i,_,{mty_desc = Tmty_signature {sig_items = sl}}) ->
       Str_modtype (string_of_ident i,List.map sig_item_of sl)
-      (* TODO Modules *)
   | Tstr_module (i,_,{mod_desc = Tmod_constraint
         ({mod_desc = Tmod_structure {str_items = sl}},
          Types.Mty_ident (Path.Pident i'),_,_)}) ->
-      Str_module (string_of_ident i,string_of_ident i',
+      Str_module (string_of_ident i, Some (string_of_ident i'),
         List.map str_item_of sl)
-  | Tstr_module (i,_,{mod_desc = Tmod_structure ({str_items = si})}) ->
-      print_string "(found module, skipping) ...";
-      Str_value (false, [])
-      (* ------------ *)
+  | Tstr_module (i,_,{mod_desc = Tmod_structure ({str_items = sl})}) ->
+      Str_module (string_of_ident i, None, List.map str_item_of sl)
   | Tstr_include ({mod_desc = Tmod_ident (Path.Pident i,_)},_) ->
       Str_include (string_of_ident i)
   | s' -> raise (Unknown_str_item s');;

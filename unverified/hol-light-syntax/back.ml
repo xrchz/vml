@@ -3,7 +3,7 @@
 
 let check_pat_constraints = ref !strip_pat_constraints;;
 
-let ocaml_ppf = ref Format.std_formatter;; 
+let ocaml_ppf = ref Format.std_formatter;;
 
 let ocaml_print s = Format.pp_print_string !ocaml_ppf s;;
 
@@ -238,7 +238,7 @@ and ocaml_print_case b (p,e) =
 and ocaml_print_cases pl =
   ocaml_print_case true (hd pl);
   iter (fun p -> ocaml_print " and "; ocaml_print_case true p) (tl pl)
-  
+
 and ocaml_print_gcase (p,g,e) =
   ocaml_print_tpat p;
  (match g with
@@ -336,7 +336,11 @@ let rec ocaml_print_str_item b s =
       iter ocaml_print_sig_item sl;
       ocaml_print ("end"^b)
   | Str_module (i1,i2,sl) ->
-      ocaml_print ("module "^i1^" : "^i2^" = struct\n\n");
+      ocaml_print ("module " ^ i1);
+      (match i2 with
+      | Some si -> ocaml_print (" : " ^ si)
+      | None -> ());
+      ocaml_print " = struct\n\n";
       iter (ocaml_print_str_item "\n\n") sl;
       ocaml_print ("end"^b)
   | Str_include i ->

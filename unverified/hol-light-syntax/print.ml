@@ -1,14 +1,15 @@
 (*Internal AST to S/Cake ML concrete syntax*)
 #use "print_util.ml";;
 
-let sml_ppf = ref Format.std_formatter;; 
+let sml_ppf = ref Format.std_formatter;;
 
 let sml_print s = Format.pp_print_string !sml_ppf s;;
 
 let sml_space n = Format.pp_print_break !sml_ppf 1 n;;
 
-let sml_emptyline () = Format.pp_print_cut !sml_ppf (); Format.pp_print_cut !sml_ppf ();;
-
+let sml_emptyline () =
+  Format.pp_print_cut !sml_ppf ();
+  Format.pp_print_cut !sml_ppf ();;
 
 let rec sml_print_typ t =
   Format.pp_open_box !sml_ppf 0;
@@ -93,8 +94,8 @@ let cake_ops =
    ">/",">";
    ">=/",">=";
    "<>/","<>";
-   "&","andalso";
-   "or","orelse"; 
+   "&&","andalso";
+   "or","orelse";
    "@","@";
    "^","^";
    ];;
@@ -126,7 +127,7 @@ let explode s =
 let print_int_string str =
   let rec print_ls ls =
     match ls with
-    | [] -> () 
+    | [] -> ()
     | [x] -> sml_print (string_of_int (Char.code x))
     | (x::xs) -> print_ls [x];sml_print",";print_ls xs in
   sml_print "[";print_ls (explode str);sml_print"]";;
@@ -339,7 +340,7 @@ and sml_print_case xx h b (p,e) =
 	 sml_print_typ (fst p);
 	 sml_print ")")
        else sml_print (sml_op s'));
-      (*let sl'' = if mem s' ignored_list 
+      (*let sl'' = if mem s' ignored_list
                  then "compare_unknown"::s'' else s'' in *)
       iter (fun s'' -> sml_print (" "^(sml_op s''))) sl'';
       sml_print " =";
@@ -364,7 +365,7 @@ and sml_print_case xx h b (p,e) =
 and sml_print_cases pl =
   sml_print_case false true true (hd pl);
   iter (fun p -> sml_print " and "; sml_print_case false false true p) (tl pl)
-  
+
 and sml_print_gcase (p,g,e) =
   Format.pp_open_box !sml_ppf 0;
   sml_print_tpat p;
@@ -451,7 +452,7 @@ let rec sml_print_str_item b s =
       Format.pp_close_box !sml_ppf ()
   | Str_exception (s,al) ->
       Format.pp_open_box !sml_ppf 0;
-      sml_print ("exception "^s);
+      sml_print ("exception " ^ s);
       if al <> [] then
        (sml_print " of ";
         sml_print_typ (hd al);
@@ -461,19 +462,17 @@ let rec sml_print_str_item b s =
   | Str_install_printer s ->
       ()
   | Str_modtype (i,sl) ->
-      ()
-(*
-      sml_print ("module type "^i^" = sig\n");
+      sml_print ("signature " ^ i ^ " = sig\n");
       iter sml_print_sig_item sl;
-      sml_print ("end"^b)
-*)
+      sml_print ("end" ^ b)
   | Str_module (i1,i2,sl) ->
+      sml_print ("structure " ^ i1);
+      (match i2 with
+      | Some sg -> sml_print (" : " ^ sg)
+      | _ -> ());
+      sml_print " = struct\n";
       iter (sml_print_str_item ";") sl;
-(*
-      sml_print ("module "^i1^" : "^i2^" = struct\n\n");
-      iter (sml_print_str_item "") sl;
-      sml_print ("end"^b)
-*)
+      sml_print ("end" ^ b)
   | Str_include i ->
       ()
 (*
@@ -483,5 +482,7 @@ let rec sml_print_str_item b s =
   sml_emptyline ();;
 
 
-let ocaml_to_sml str = 
-  iter (sml_print_str_item ";") (flatten (map bake_str_item (flatten (process_string str))));;
+let ocaml_to_sml str =
+  iter (sml_print_str_item ";")
+       (flatten (map bake_str_item (flatten (process_string str))));;
+

@@ -69,7 +69,7 @@ let rec split_tpat p =
       map (fun p' -> t,Pat_alias(p',s)) (split_tpat p)
   | Pat_or (p1,p2) -> (split_tpat p1)@(split_tpat p2)
   | _ -> [p]
-  
+
 and split_tpat_list pl =
   match pl with
   | [] -> [[]]
@@ -158,9 +158,9 @@ let rec bake_texp (t,e) =
       (t,Exp_apply (bake_texp e', map bake_texp el))
   | _ -> (t,bake_exp e)
 
-(* Attempt at supporting generic compare by adding an extra type 
+(* Attempt at supporting generic compare by adding an extra type
    parameter to func calls
-and bake_apply (t,e) = 
+and bake_apply (t,e) =
   match e with
     Exp_qual_ident (_,funName) | Exp_ident (funName) ->
        (*For now, applied to ALL functions*)
@@ -310,7 +310,7 @@ let rec subst_var sl e =
   | Exp_ifthenelse (e1,e2,e3) ->
       Exp_ifthenelse (subst_var sl e1,subst_var sl e2,subst_var sl e3)
   | Exp_constraint (e',t) -> Exp_constraint (subst_var sl e',t)
-  | _ -> e 
+  | _ -> e
 
 and subst_gcase sl (p,g,e) =
   let sl' = subtract' sl (vars_in p) in
@@ -398,30 +398,30 @@ let rec flatten_lets fl =
       | _ -> [Str_value (false,bake_vcases pl)];;
 
 
-(* Attempt to automatically generate an OCaml-like comparison function 
+(* Attempt to automatically generate an OCaml-like comparison function
    for datatypes
 (*for a single monomorphic datatype, equality for now
 
-let eq (x,y) = 
+let eq (x,y) =
 match (x,y) with
   (Ala,Ala) -> true
 |  _ -> false;;
 *)
 
 (*Generate the appropriate any pattern vars to match
-    e.g. Ctor (_,_)*) 
-let rec toAnyPat ls = 
+    e.g. Ctor (_,_)*)
+let rec toAnyPat ls =
   match ls with [] -> []
   |    (x::xs) -> (x,Pat_any) :: toAnyPat xs;;
 
-(*Generate the obvious comparisons across different constructors*) 
+(*Generate the obvious comparisons across different constructors*)
 let rec genComparisons_1 base_ty ls =
   match ls with
     [] -> []
-  | ((a,b)::xs) -> 
+  | ((a,b)::xs) ->
       let rec mk ls = match ls
         with [] -> []
-        |    ((c,d)::ys) -> 
+        |    ((c,d)::ys) ->
                    ((Typ_tuple [base_ty; base_ty],
                      Pat_tuple
                      [(base_ty, Pat_construct (a,toAnyPat b));
@@ -436,7 +436,7 @@ let rec genComparisons_1 base_ty ls =
     e.g. Ctor (l1,l2)*)
 let rec toNamedPat str num ls =
   match ls with [] -> []
-  |    (x::xs) -> 
+  |    (x::xs) ->
          (x,Pat_var (str^(string_of_int num)))::toNamedPat str (num+1) xs
 (*Generate the typed calls to comparator*)
 let rec toCompare leftstr rightstr num ls =
@@ -445,14 +445,14 @@ let rec toCompare leftstr rightstr num ls =
          (match x with Typ_constr(name,args) ->
          (Typ_constr ("int",[]),
           Exp_apply ((Typ_arrow (x,Typ_arrow (x,Typ_constr("int",[]))),
-                      Exp_ident ("compare_"^name)), 
+                      Exp_ident ("compare_"^name)),
                      [(x,Exp_ident (leftstr^(string_of_int num)));
                       (x,Exp_ident (rightstr^(string_of_int num)))]))
-         | _ ->  (Typ_constr ("int",[]), Exp_int (0))) 
+         | _ ->  (Typ_constr ("int",[]), Exp_int (0)))
          :: toCompare leftstr rightstr (num+1) xs;;
 
 (*Generate the comparisons within a constructor with a catchall->false*)
-let rec genComparisons_2 base_ty ls = 
+let rec genComparisons_2 base_ty ls =
   match ls with
     [] -> [((Typ_tuple [base_ty; base_ty],
                    Pat_any),
@@ -483,7 +483,7 @@ let accum = ref ["data_sentinel"];;
 (*To support polymorphism, need to pass the type as an argument*)
 let bake_datatype d =
   match d with
-  | (name,typlist,Type_variant ls) -> 
+  | (name,typlist,Type_variant ls) ->
     let base_ty = Typ_constr(name,[]) in
     let fun_ty = Typ_arrow (base_ty,
                  Typ_arrow (base_ty, Typ_constr("int",[]))) in
@@ -492,7 +492,7 @@ let bake_datatype d =
     in
     (accum:=name::!accum;[Str_value (false,
       (*let x y = *)
-      [(fun_ty, 
+      [(fun_ty,
         (fun_ty,Pat_constraint ((fun_ty, Pat_var ("compare_"^name)),base_ty)),
         (fun_ty,
           Exp_function [((base_ty, Pat_var "x"), None,
@@ -507,7 +507,7 @@ let bake_datatype d =
                     (base_ty, Exp_ident "y")]),
                 (*list of pattern -> expr*)
                 genComparisons_1 base_ty ls @ genComparisons_2 base_ty ls
-                )))]))]))])])  
+                )))]))]))])])
     | _ -> []
 *)
 
