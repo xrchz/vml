@@ -1,2 +1,12 @@
 #!/bin/sh
-rlwrap ocamltop_j -I +compiler-libs -I +camlp5
+OCAMLTOP_J=./ocamltop_j
+FLAGS="-I +compiler-libs -I `camlp5 -where`"
+if [ -x "$(command -v $OCAMLTOP_J)" ]; then
+  if [ -x "$(command -v rlwrap)" ]; then
+    exec rlwrap $OCAMLTOP_J $FLAGS
+  else
+    exec $OCAMLTOP_J $FLAGS
+  fi
+else
+  echo "Please run 'make' to build the HOL light tools."
+fi
