@@ -8,9 +8,8 @@
 (*Process OCaml from source files and keep a list of processed items*)
 
 let str_items = ref ([]:ml_str_item list);;
-
-let env = ref(!Toploop.toplevel_env)
-let execute = ref false;;
+let env       = ref(!Toploop.toplevel_env)
+let execute   = ref false;;
 
 let rec process_file name =
   Warnings.parse_options false "-8";
@@ -30,7 +29,7 @@ let rec process_file name =
          | Parsetree.Ptop_def s ->
              let (str,_,newenv) = Typemod.type_toplevel_phrase !env s in
              env:=newenv;
-	     if(!execute) then 
+	     if(!execute) then
                ignore (Toploop.execute_phrase false
                        Format.std_formatter phrase);
 	     List.map str_item_of str.str_items;
@@ -41,30 +40,8 @@ let rec process_file name =
     phrases;
   Warnings.parse_options false "+8";;
 
-use_file := process_file;;
 
-let start_time = Sys.time();;
-
-print_string "Parsing & Executing...";;
-
-execute:=true;;
-
-(*Load the HOL Light state only*)
-(*List.iter (fun s ->
-  str_items := [];
-  print_string (s^"\n");
-  loads (s^".ml") )
-  [
-  "lib";
-  "fusion";
-  "basics";
-  "nets";
-  "printer";
-  "preterm";
-  "parser";];;
-*)
-
-let print_sml name_sml baked= 
+let print_sml name_sml baked=
   let ch = open_out name_sml in
     sml_ppf := Format.formatter_of_out_channel ch;
     Format.pp_open_vbox !sml_ppf 0;
@@ -77,54 +54,75 @@ let print_sml name_sml baked=
     sml_ppf := Format.std_formatter;
     close_out ch;;
 
-List.iter (fun (s,b) -> 
+let to_sml (s, b) =
   str_items := [];
-  print_string (s^"\n");
-  loads (s^".ml");
-  (if b then print_sml ("sml/"^s^".sml") (flatten (map bake_str_item !str_items)))
-  ) [
-  "lib",true;
-  "fusion",true;
-  "basics",true;
-  "nets",false; (*Removed equality type*)
-  "printer",false; (*Custom printer.sml*)
-  "preterm",true;
-  "parser",false; (*Custom changes to parser.sml*)
-  "equal",true;
-  "bool",true;
-  "drule",true;
-  "tactics",true;
-  "itab",true;
-  "simp",true;
-  "theorems",true;
-  "ind_defs",true;
-  "class",true;
-  "trivia",true;
-  "canon",true;
-  "meson",true;
-  "quot",true;
-  "pair",true;
-  "nums",true;
-  "recursion",true;
-  "arith",true;
-  "wf",true;
-  "calc_num",true;
-  "normalizer",true;
-  "grobner",true;
-  "ind_types",true;
-  "lists",true;
-  "realax",true;
-  "calc_int",true;
-  "realarith",true;
-  "real",true;
-  "calc_rat",true;
-  "int",true;
-  "sets",true;
-  "iterate",true;
-  "cart",true;
-  "define",true;
-];;
+  print_string (" - \"" ^ s ^ ".ml\" ...");
+  Format.print_flush ();
+  loads (s ^ ".ml");
+  print_string " done\n";
+  if b then
+    print_sml ("sml/" ^ s ^ ".sml") (flatten (map bake_str_item !str_items));;
 
+let hol_thys = [
+  "lib"     , false;
+  "fusion"  , false;
+  "basics"  , false;
+  "nets"    , false;
+  "printer" , false;
+  "preterm" , false;
+  "parser"  , false;
+  ];;
+
+let thys = [
+  "lib"        , true;
+  "fusion"     , true;
+  "basics"     , true;
+  "nets"       , false; (*Removed equality type*)
+  "printer"    , false; (*Custom printer.sml*)
+  "preterm"    , true;
+  "parser"     , false; (*Custom changes to parser.sml*)
+  "equal"      , true;
+  "bool"       , true;
+  "drule"      , true;
+  "tactics"    , true;
+  "itab"       , true;
+  "simp"       , true;
+  "theorems"   , true;
+  "ind_defs"   , true;
+  "class"      , true;
+  "trivia"     , true;
+  "canon"      , true;
+  "meson"      , false; (* uses unsupported modules *)
+  "metis"      , false; (* uses unsupported modules *)
+  "quot"       , true;
+  "pair"       , true;
+  "nums"       , true;
+  "recursion"  , true;
+  "arith"      , true;
+  "wf"         , true;
+  "calc_num"   , true;
+  "normalizer" , true;
+  "grobner"    , true;
+  "ind_types"  , true;
+  "lists"      , true;
+  "realax"     , true;
+  "calc_int"   , true;
+  "realarith"  , true;
+  "real"       , true;
+  "calc_rat"   , true;
+  "int"        , true;
+  "sets"       , true;
+  "iterate"    , true;
+  "cart"       , true;
+  "define"     , true;
+  ];;
+
+let _ =
+  use_file := process_file;
+  execute := false;
+  print_string "- parsing"
+  if !execute then print_string " and executing:\n" else print_string ":\n";
+  List.iter to_sml thys ;;
 
 (*Back into OCaml*)
 (*
