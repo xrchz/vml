@@ -475,6 +475,9 @@ let rec sml_print_str_item b s =
       sml_print ("end" ^ b)
   | Str_include i ->
       ()
+  | Str_open i ->
+      sml_print ("open " ^ i);
+      sml_print b
 (*
       sml_print ("include "^i^b)
 *)

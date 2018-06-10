@@ -92,7 +92,7 @@ let thys = [
   "class"      , true;
   "trivia"     , true;
   "canon"      , true;
-  "meson"      , false; (* uses unsupported modules *)
+  "meson"      , true;
   "metis"      , false; (* uses unsupported modules *)
   "quot"       , true;
   "pair"       , true;

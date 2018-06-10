@@ -344,7 +344,9 @@ let rec ocaml_print_str_item b s =
       iter (ocaml_print_str_item "\n\n") sl;
       ocaml_print ("end"^b)
   | Str_include i ->
-      ocaml_print ("include "^i^b);;
+      ocaml_print ("include "^i^b)
+  | Str_open i ->
+      ocaml_print ("open " ^ i ^ b);;
 
 (*
 let rec find_differences n l1 l2 =

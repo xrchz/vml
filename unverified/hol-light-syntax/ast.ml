@@ -54,4 +54,5 @@ type ml_str_item =
 | Str_install_printer of string
 | Str_modtype of string * ml_sig_item list
 | Str_module of string * string option * ml_str_item list
-| Str_include of string;;
+| Str_include of string
+| Str_open of string;;

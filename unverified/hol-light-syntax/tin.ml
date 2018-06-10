@@ -221,6 +221,8 @@ let rec str_item_of s =
       Str_module (string_of_ident i, None, List.map str_item_of sl)
   | Tstr_include ({mod_desc = Tmod_ident (Path.Pident i,_)},_) ->
       Str_include (string_of_ident i)
+  | Tstr_open (_, Pident i, _) ->
+      Str_open (string_of_ident i)
   | s' -> raise (Unknown_str_item s');;
 
 Hashtbl.reset typ_abbrevs;;
