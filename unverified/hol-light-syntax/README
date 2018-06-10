@@ -1,0 +1,44 @@
+## REQUIREMENTS
+
+* A OCaml compiler with compatible complier-libs.
+
+  4.01.0 seems to work, but 4.02.1 does not work due to changes to the
+  type expressions syntax. For even newer versions, the environment gotten
+  from Toploop (i.e. `Toploop.toplevel_env ()`) seems to not contain the
+  necessary things. The simplest way to get the necessary tools seems to be
+  using opam:
+
+  > opam switch 4.01.0
+
+* camlp5, num and HOL light installed. HOL light is available from
+  https://github.com/jrh13/hol-light/. These tools were tested on the
+  commit with SHA 6bc76990b. The camlp5 and num libraries are necessary
+  for both HOL light and this tool, and can be installed easily using opam:
+
+  > opam install camlp5 num
+
+* Ensure that the environment variable HOLLIGHT_DIR points to the location where
+  you built HOL light.
+
+## USAGE
+
+The tool is used as follows.
+
+1. Build the AST module and make the custom OCaml toplevel (REPL) `ocamltop_j`
+   by calling make:
+
+   > make
+
+2. Run the tool using the custom script `ocaml_j`:
+
+   > sh ocaml_j
+
+3. Load and run the main script by typing the following into the REPL:
+
+   > #use "do_hol.ml";;
+
+   Note that the `#` is not optional; it is part of the use directive. Any
+   commands must be terminated by ';;' for the REPL to accept them.
+
+If all goes well, a directory `sml/` containing the resulting translated files
+will appear.
