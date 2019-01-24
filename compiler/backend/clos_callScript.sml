@@ -32,22 +32,22 @@ val free_def = tDefine "free" `
   (free [Op t op xs] =
      let (c1,l1) = free xs in
        ([Op t op c1],l1)) /\
-  (free [App t loc_opt x1 xs2] =
+  (free [App t fn_opt x1 xs2] =
      let (c1,l1) = free [x1] in
      let (c2,l2) = free xs2 in
-       ([App t loc_opt (HD c1) c2],mk_Union l1 l2)) /\
-  (free [Fn t loc _ num_args x1] =
+       ([App t fn_opt (HD c1) c2],mk_Union l1 l2)) /\
+  (free [Fn t fn_opt _ num_args x1] =
      let (c1,l1) = free [x1] in
      let l2 = Shift num_args l1 in
-       ([Fn t loc (SOME (vars_to_list l2)) num_args (HD c1)],l2)) /\
-  (free [Letrec t loc _ fns x1] =
+       ([Fn t fn_opt (SOME (vars_to_list l2)) num_args (HD c1)],l2)) /\
+  (free [Letrec t fn_opt _ fns x1] =
      let m = LENGTH fns in
      let res = MAP (\(n,x). let (c,l) = free [x] in
                               ((n,HD c),Shift (n + m) l)) fns in
      let c1 = MAP FST res in
      let l1 = list_mk_Union (MAP SND res) in
      let (c2,l2) = free [x1] in
-       ([Letrec t loc (SOME (vars_to_list l1)) c1 (HD c2)],
+       ([Letrec t fn_opt (SOME (vars_to_list l1)) c1 (HD c2)],
         mk_Union l1 (Shift (LENGTH fns) l2))) /\
   (free [Handle t x1 x2] =
      let (c1,l1) = free [x1] in
@@ -102,14 +102,14 @@ val EL_MEM_LEMMA = Q.prove(
   `!xs i x. i < LENGTH xs /\ (x = EL i xs) ==> MEM x xs`,
   Induct \\ fs [] \\ REPEAT STRIP_TAC \\ Cases_on `i` \\ fs []);
 
-val insert_each_def = Define `
-  (insert_each p 0 g = g) /\
-  (insert_each p (SUC n) (g1,g2) = insert_each (p+2) n (insert p () g1,g2))`
+val insert_next_fnames_def = Define `
+  insert_next_fnames fname i (g1, g2) =
+    (fntree_list_insert (GENLIST (next_fname fname o ( * ) 2) i) g1, g2)`;
 
 val code_list_def = Define `
-  (code_list loc [] g = g) /\
-  (code_list loc ((n,p)::xs) (g1,g2) =
-     code_list (loc+2n) xs (g1,(loc+1,n,p)::g2))`
+  (code_list fname [] g = g) /\
+  (code_list fname ((n,p)::xs) (g1,g2) =
+     code_list (next_fname fname 2) xs (g1,(next_fname fname 1,n,p)::g2))`
 
 val GENLIST_Var_def = Define `
   GENLIST_Var t i n =
@@ -117,14 +117,19 @@ val GENLIST_Var_def = Define `
       GENLIST_Var t (i+1) (n-1:num) ++ [Var (t § i) (n-1)]`;
 
 val calls_list_def = Define `
-  (calls_list t i loc [] = []) /\
-  (calls_list t i loc ((n,_)::xs) =
-     (n,Call (t§i§0) 0 (loc+1) (GENLIST_Var (t§i) 1 n))::
-          calls_list t (i+1) (loc+2n) xs)`;
+  (calls_list t i fnm [] = []) /\
+  (calls_list t i fnm ((n,_)::xs) =
+     (n,Call (t§i§0) 0 (next_fname fnm 1) (GENLIST_Var (t§i) 1 n))::
+          calls_list t (i+1) (next_fname fnm 2) xs)`;
 
 val exp3_size_MAP_SND = Q.prove(
   `!fns. exp3_size (MAP SND fns) <= exp1_size fns`,
   Induct \\ fs [exp_size_def,FORALL_PROD]);
+
+(* An irrelevant function identifier, used in some irrelevant locations
+   below where a value must be named to simplify the conditional structure. *)
+val default_fname_def = Define `
+  default_fname = (<| era := 0; id := 0 |> : fname)`
 
 val calls_def = tDefine "calls" `
   (calls [] g = ([],g)) /\
@@ -167,42 +172,44 @@ val calls_def = tDefine "calls" `
   (calls [Op t op xs] g =
      let (e1,g) = calls xs g in
        ([Op t op e1],g)) /\
-  (calls [App t loc_opt x xs] g =
+  (calls [App t fn_opt x xs] g =
      let (es,g) = calls xs g in
      let (e1,g) = calls [x] g in
      let e1 = HD e1 in
-     let loc = (case loc_opt of SOME loc => loc | NONE => 0) in
-       if IS_SOME loc_opt /\ IS_SOME (lookup loc (FST g)) then
-         if pure x then ([Call t (LENGTH es) (loc+1) es],g) else
+     let fname = case fn_opt of SOME fname => fname | _ => default_fname in
+     let next = next_fname fname 1 in
+       if IS_SOME fn_opt /\ IS_SOME (fntree_lookup fname (FST g)) then
+         if pure x then ([Call t (LENGTH es) next es],g) else
            ([Let (t§0) (SNOC e1 es)
-              (Call (t§1) (LENGTH es) (loc+1) (GENLIST_Var t 2 (LENGTH es)))],g)
-       else ([App t loc_opt e1 es],g)) /\
-  (calls [Fn t loc_opt ws num_args x1] g =
-     (* loc_opt ought to be SOME loc, with loc being EVEN *)
-     let loc = (case loc_opt of SOME loc => loc | NONE => 0) in
-     let new_g = insert_each loc 1 g in
+              (Call (t§1) (LENGTH es) next (GENLIST_Var t 2 (LENGTH es)))],g)
+       else ([App t fn_opt e1 es],g)) /\
+  (calls [Fn t fn_opt ws num_args x1] g =
+     (* fn_opt ought to be SOME fname, with fname.id being EVEN *)
+     let fname = (case fn_opt of SOME fname => fname | _ => default_fname) in
+     let next = next_fname fname 1 in
+     let new_g = insert_next_fnames fname 1 g in
      let (e1,new_g) = calls [x1] new_g in
-     let new_g = (FST new_g,(loc+1,num_args,HD e1)::SND new_g) in
+     let new_g = (FST new_g,(next,num_args,HD e1)::SND new_g) in
        (* Closedness is checked on the transformed program because
           the calls function can sometimes remove free variables. *)
-       if closed (Fn t loc_opt ws num_args (HD e1)) then
-         ([Fn (t§0) loc_opt ws num_args
-             (Call (t§0§0) 0 (loc+1) (GENLIST_Var (t§0) 1 num_args))],new_g)
+       if closed (Fn t fn_opt ws num_args (HD e1)) then
+         ([Fn (t§0) fn_opt ws num_args
+             (Call (t§0§0) 0 next (GENLIST_Var (t§0) 1 num_args))],new_g)
        else
          let (e1,g) = calls [x1] g in
-           ([Fn t loc_opt ws num_args (HD e1)],g)) /\
-  (calls [Letrec t loc_opt ws fns x1] g =
-     let loc = (case loc_opt of SOME loc => loc | NONE => 0) in
-     let new_g = insert_each loc (LENGTH fns) g in
+           ([Fn t fn_opt ws num_args (HD e1)],g)) /\
+  (calls [Letrec t fn_opt ws fns x1] g =
+     let fname = (case fn_opt of SOME fname => fname | _ => default_fname) in
+     let new_g = insert_next_fnames fname (LENGTH fns) g in
      let (fns1,new_g) = calls (MAP SND fns) new_g in
        if EVERY2 (\(n,_) p. closed (Fn t NONE NONE n p)) fns fns1 then
-         let new_g = code_list loc (ZIP (MAP FST fns,fns1)) new_g in
+         let new_g = code_list fname (ZIP (MAP FST fns,fns1)) new_g in
          let (e1,g) = calls [x1] new_g in
-           ([Letrec (t§0) loc_opt ws (calls_list t 1 loc fns) (HD e1)],g)
+           ([Letrec (t§0) fn_opt ws (calls_list t 1 fname fns) (HD e1)],g)
        else
          let (fns1,g) = calls (MAP SND fns) g in
          let (e1,g) = calls [x1] g in
-           ([Letrec t loc_opt ws (ZIP (MAP FST fns,fns1)) (HD e1)],g))`
+           ([Letrec t fn_opt ws (ZIP (MAP FST fns,fns1)) (HD e1)],g))`
  (WF_REL_TAC `measure (exp3_size o FST)`
   \\ REPEAT STRIP_TAC
   \\ fs [GSYM NOT_LESS]
@@ -239,9 +246,11 @@ Theorem compile_nil
 
 val selftest = let
   (* example code *)
-  val f = ``Fn None (SOME 800) NONE 1 (Op None Add [Var None 0; Op None (Const 1) []])``
-  val g = ``Fn None (SOME 900) NONE 1 (App None (SOME 800) (Var None 1) [Var None 0])``
-  val f_g_5 = ``App None (SOME 800) (Var None 1) [App None (SOME 900) (Var None 0) [Op None (Const 5) []]]``
+  val f_id = ``Function_Name 0 800``;
+  val f = ``Fn None (SOME ^f_id) NONE 1 (Op None Add [Var None 0; Op None (Const 1) []])``
+  val g_id = ``Function_Name 0 900``;
+  val g = ``Fn None (SOME ^g_id) NONE 1 (App None (SOME ^f_id) (Var None 1) [Var None 0])``
+  val f_g_5 = ``App None (SOME ^f_id) (Var None 1) [App None (SOME ^g_id) (Var None 0) [Op None (Const 5) []]]``
   val let_let = ``[Let None [^f] (Let None [^g] ^f_g_5)]``
   (* compiler evaluation *)
   val tm = EVAL ``compile T ^let_let`` |> concl

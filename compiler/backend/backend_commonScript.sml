@@ -110,4 +110,38 @@ val word_shift_def = Define `
        generated CakeML code *)
     if dimindex (:'a) = 32 then 2 else 3:num`;
 
+(* Compound function identifiers. These permit compiler "generations" or "eras".
+   An era change creates an entire space of new names for new function bodies,
+   all of which are guaranteed to be fresh. The long type name Function_Name is
+   also the name of the constructor, and the shorter type name 'fname' is also
+   available. *)
+val _ = Datatype `
+  Function_Name = <| era : num; id : num |>`;
+val _ = type_abbrev ("fname", ``: Function_Name``);
+
+val next_fname_def = Define `
+  next_fname fname i = (fname with <| id := fname.id + i |>)`;
+
+(* Using function identifiers in sptrees. *)
+
+val _ = type_abbrev ((* 'a *) "fntree", ``: ('a sptree$spt) sptree$spt``);
+
+val sptree_update_def = Define `
+  sptree_update k f def spt = sptree$insert k
+    (f (case sptree$lookup k spt of NONE => def | SOME v => v)) spt`;
+
+val fntree_insert_def = Define `
+  fntree_insert fname v fnt = sptree_update fname.era
+    (sptree$insert fname.id v) sptree$LN fnt`;
+
+val fntree_lookup_def = Define `
+  fntree_lookup fname fnt = case sptree$lookup fname.era fnt of
+      NONE => NONE
+    | SOME spt => sptree$lookup fname.id spt`;
+
+val fntree_list_insert = Define `
+  (fntree_list_insert [] fnt = fnt) /\
+  (fntree_list_insert (fname :: fnames) fnt =
+    fntree_list_insert fnames (fntree_insert fname () fnt))`;
+
 val _ = export_theory();

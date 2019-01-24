@@ -12,7 +12,8 @@ open db_varsTheory clos_ticksTheory clos_letopTheory clos_fvsTheory;
 
 val _ = new_theory "clos_known";
 
-(* val _ = set_grammar_ancestry ["closLang", "sptree", "misc", "backend_common"] *)
+val _ = set_grammar_ancestry ["closLang", "sptree", "misc", "backend_common",
+  "db_vars"];
 
 val _ = patternMatchesLib.ENABLE_PMATCH_CASES();
 
@@ -242,7 +243,7 @@ val contains_closures_def = tDefine "contains_closures" `
   This compiler transformation turns App NONEs into APP SOMEs.
   An App can carry a `SOME loc` if:
    1) the closure value that is used there was created with location loc;
-   2) the closure value exepcts the number of arguments it gets here.
+   2) the closure value expects the number of arguments it gets here.
 
   This part of the compiler makes two passes. The first pass tracks
   which closure values flow into which globals. The second pass tracks
@@ -253,8 +254,8 @@ val contains_closures_def = tDefine "contains_closures" `
 
 val _ = Datatype `
   val_approx =
-    ClosNoInline num num        (* location in code table, arity *)
-  | Clos num num exp num        (* loc, arity, body, body size *)
+    ClosNoInline fname num      (* location in code table, arity *)
+  | Clos fname num exp num      (* loc, arity, body, body size *)
   | Tuple num (val_approx list) (* conses or tuples *)
   | Int int                     (* used to index tuples *)
   | Other                       (* unknown *)
@@ -404,9 +405,9 @@ val clos_approx_def = Define `
 `;
 
 val clos_gen_noinline_def = Define`
-  (clos_gen_noinline n i [] = []) /\
-  (clos_gen_noinline n i ((a,e)::xs) =
-    ClosNoInline (n+2*i) a::clos_gen_noinline n (i+1) xs)`;
+  (clos_gen_noinline fname i [] = []) /\
+  (clos_gen_noinline fname i ((a,e)::xs) =
+    ClosNoInline (next_fname fname (2*i)) a::clos_gen_noinline fname (i+1) xs)`;
 
 val _ = Datatype `globalOpt = gO_Int int | gO_NullTuple num | gO_None`
 
@@ -436,7 +437,7 @@ val mk_Ticks_def = tDefine "mk_Ticks" `
 
 val _ = Datatype `
   inliningDecision = inlD_Nothing
-                   | inlD_Annotate num
+                   | inlD_Annotate fname
                    | inlD_LetInline exp
 `;
 
@@ -620,11 +621,13 @@ val compile_def = Define `
   compile (SOME c) exps =
     let exps = clos_fvs$compile exps in
     let (es, g) = known c exps [] LN in
-    let es1 = remove_ticks (MAP FST es) in
-    let es2 = let_op es1 in
+    let es1 = clos_ticks$remove_ticks (MAP FST es) in
+    let es2 = clos_letop$let_op es1 in
       (SOME (c with val_approx_spt := g), es2)`;
 
 (*
+FIXME: some of these tests apparently haven't run in a while, and aren't
+type correct.
 
 (* Trace starting points *)
 val t0 = ``SourceLoc 0 0 0 0``;
@@ -636,10 +639,11 @@ val const2 = ``Op None (Const 2) []``;
 
 
 (* fn f x => f x *)
-val apply = ``Fn None (SOME 0) NONE 2 (App ^t0 NONE (Var None 0) [Var None 1])``;
+val f = ``\n. SOME (Function_Name 0 n)``;
+val apply = ``Fn None (^f 0) NONE 2 (App ^t0 NONE (Var None 0) [Var None 1])``;
 
 (* fn x => x + 1 *)
-val succ = ``Fn None (SOME 2) NONE 1 (Op None Add [Var None 0; ^const1])``;
+val succ = ``Fn None (^f 2) NONE 1 (Op None Add [Var None 0; ^const1])``;
 
 (* -------------------------------*)
 
