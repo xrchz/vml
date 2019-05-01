@@ -783,6 +783,13 @@ val extend_dec_env : sem_env v -> sem_env v -> sem_env v
 let extend_dec_env new_env env =
   <| c = nsAppend new_env.c env.c; v = nsAppend new_env.v env.v |>
 
+val check_ctor_types : v -> ast_t -> maybe (list type_def) -> bool
+let check_ctor_types v t tdss =
+  match tdss with
+    | Nothing -> true
+    | Just tdss -> true (* TODO *)
+  end
+
 (*
 val decs_to_types : list dec -> list typeN
 let decs_to_types ds =

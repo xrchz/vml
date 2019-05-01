@@ -365,7 +365,7 @@ is_value (Var _) = true
 and
 is_value (Fun _ _) = true
 and
-is_value (Tannot e _) = is_value e
+is_value (Tannot e _ _) = is_value e
 and
 is_value (Lannot e _) = is_value e
 and
@@ -638,12 +638,12 @@ type_e tenv tenvE (Letrec funs e) t
 
 and
 
-typeannot: forall tenv tenvE e t.
+typeannot: forall tenv tenvE e t tdss.
 check_freevars_ast [] t &&
 check_type_names tenv.t t &&
 type_e tenv tenvE e (type_name_subst tenv.t t)
 ==>
-type_e tenv tenvE (Tannot e t) (type_name_subst tenv.t t)
+type_e tenv tenvE (Tannot e t tdss) (type_name_subst tenv.t t)
 
 and
 

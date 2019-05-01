@@ -151,8 +151,12 @@ val _ = Define `
   else
     (st, Rerr (Rabort Rtype_error))))
 /\
-((evaluate:'ffi state ->(v)sem_env ->(exp)list -> 'ffi state#(((v)list),(v))result) st env [Tannot e t]=
-   (evaluate st env [e]))
+((evaluate:'ffi state ->(v)sem_env ->(exp)list -> 'ffi state#(((v)list),(v))result) st env [Tannot e t tdss]=
+   ((case evaluate st env [e] of
+    (st', Rval [v]) => if check_ctor_types v t tdss then (st', Rval [v])
+                       else (st', Rerr (Rabort Rtype_error))
+  | res => res
+  )))
 /\
 ((evaluate:'ffi state ->(v)sem_env ->(exp)list -> 'ffi state#(((v)list),(v))result) st env [Lannot e l]=
    (evaluate st env [e]))
@@ -239,6 +243,5 @@ val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn
   )))`;
 
 val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn.save_defn) evaluate_decs_defn;
-
 val _ = export_theory()
 

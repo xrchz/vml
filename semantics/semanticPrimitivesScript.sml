@@ -915,6 +915,15 @@ val _ = Define `
    (<| c := (nsAppend new_env.c env.c); v := (nsAppend new_env.v env.v) |>))`;
 
 
+(*val check_ctor_types : v -> ast_t -> maybe (list type_def) -> bool*)
+val _ = Define `
+ ((check_ctor_types:v -> ast_t ->((type_def)list)option -> bool) v t tdss=
+   ((case tdss of
+      NONE => T
+    | SOME tdss => T (* TODO *)
+  )))`;
+
+
 (*
 val decs_to_types : list dec -> list typeN
 let decs_to_types ds =

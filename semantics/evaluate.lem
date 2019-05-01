@@ -134,8 +134,12 @@ evaluate st env [Letrec funs e] =
   else
     (st, Rerr (Rabort Rtype_error))
 and
-evaluate st env [Tannot e t] =
-  evaluate st env [e]
+evaluate st env [Tannot e t tdss] =
+  match evaluate st env [e] with
+  | (st', Rval [v]) -> if check_ctor_types v t tdss then (st', Rval [v])
+                       else (st', Rerr (Rabort Rtype_error))
+  | res -> res
+  end
 and
 evaluate st env [Lannot e l] =
   evaluate st env [e]
@@ -220,4 +224,3 @@ evaluate_decs st env [Dlocal lds ds] =
     evaluate_decs st1 (extend_dec_env env1 env) ds
   | res -> res
   end
-
