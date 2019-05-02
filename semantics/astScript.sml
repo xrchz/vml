@@ -153,8 +153,9 @@ val _ = Hol_datatype `
   | Pref of pat
   | Ptannot of pat => ast_t`;
 
-
-val _ = type_abbrev( "type_def" , ``: ( tvarN list # typeN # (conN # ast_t list) list) list``);
+(* A context-free grammar for constructor values *)
+val _ = type_abbrev( "con_row" , ``: 'a option # tvarN option list``);
+val _ = type_abbrev( "con_gram" , ``: tvarN # (tvarN # 'a con_row list) list``);
 
 (* Expressions *)
 val _ = Hol_datatype `
@@ -184,10 +185,11 @@ val _ = Hol_datatype `
      The first varN is the function's name, and the second varN
      is its parameter. *)
   | Letrec of (varN # varN # exp) list => exp
-  | Tannot of exp => ast_t =>  ( type_def list)option
+  | Tannot of exp => ast_t => ((((modN, conN)id) con_gram) option)
   (* Location annotated expressions, not expected in source programs *)
   | Lannot of exp => locs`;
 
+val _ = type_abbrev( "type_def" , ``: ( tvarN list # typeN # (conN # ast_t list) list) list``);
 
 (* Declarations *)
 val _ = Hol_datatype `
@@ -254,6 +256,26 @@ type specs = list spec
 ((pats_bindings:(pat)list ->(string)list ->(string)list) (p::ps) already_bound=
    (pats_bindings ps (pat_bindings p already_bound)))`;
 
+val con_calls_def = Define `
+  (con_calls n [] = ([],Con NONE [])) /\
+  (con_calls n (NONE::xs) =
+     let (ps,e) = con_calls n xs in (Pany::ps,e)) /\
+  (con_calls n (SOME k::xs) =
+     let (ps,e) = con_calls (n ++ "a") xs in
+       (Pvar n::ps,Let NONE (App Opapp [Var (Short ("c" ++ k)); Var (Short n)]) e))`
+
+val con_row_def = Define `
+  (con_row (x,vs) =
+    let (ps,c) = con_calls "a" vs in (Pcon x ps, c))`
+
+val con_gram_def = Define `
+  (con_gram NONE x = Con NONE []) /\
+  (con_gram (SOME ((start,rules):((modN,conN)id) con_gram)) x =
+     (Let (SOME "b") x
+       (Letrec
+         (MAP (λ(rn,opts). ("c" ++ rn,"x",Mat (Var (Short "x"))
+            (MAP con_row opts ++ [(Pany,App Opapp [])]))) rules)
+         (App Opapp [Var (Short ("c" ++ start)); Var (Short "b")])))) `
+
 val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn.save_defn) pat_bindings_defn;
 val _ = export_theory()
-

@@ -851,7 +851,7 @@ Theorem evaluate_ffi_intro `
     \\ fs[state_component_equality] )
   >- (
     rfs[evaluate_def]
-    \\ rw[state_component_equality] )
+    \\ fs [pair_case_eq,result_case_eq,list_case_eq,bool_case_eq] \\ rveq \\ fs [])
   >- (
     rfs[evaluate_def]
     \\ rw[state_component_equality] )

@@ -40,7 +40,6 @@ val _ = Define `
 /\
 ((list_result:('a,'b)result ->(('a list),'b)result) (Rerr e)=  (Rerr e))`;
 
-
 (*val evaluate : forall 'ffi. state 'ffi -> sem_env v -> list exp -> state 'ffi * result (list v) v*)
 (*val evaluate_match : forall 'ffi. state 'ffi -> sem_env v -> v -> list (pat * exp) -> v -> state 'ffi * result (list v) v*)
  val evaluate_defn = Defn.Hol_multi_defns `
@@ -151,12 +150,12 @@ val _ = Define `
   else
     (st, Rerr (Rabort Rtype_error))))
 /\
-((evaluate:'ffi state ->(v)sem_env ->(exp)list -> 'ffi state#(((v)list),(v))result) st env [Tannot e t tdss]=
-   ((case evaluate st env [e] of
-    (st', Rval [v]) => if check_ctor_types v t tdss then (st', Rval [v])
-                       else (st', Rerr (Rabort Rtype_error))
-  | res => res
-  )))
+((evaluate:'ffi state ->(v)sem_env ->(exp)list -> 'ffi state#(((v)list),(v))result) st env [Tannot e t cg] =
+   (case evaluate st env [e] of
+    | (st',Rval [v]) =>
+        if con_gram_check (con_gram_lookup env.c cg) v then (st',Rval [v])
+        else (st', Rerr (Rabort Rtype_error))
+    | res => res))
 /\
 ((evaluate:'ffi state ->(v)sem_env ->(exp)list -> 'ffi state#(((v)list),(v))result) st env [Lannot e l]=
    (evaluate st env [e]))
@@ -171,6 +170,7 @@ val _ = Define `
     | Match_type_error => (st, Rerr (Rabort Rtype_error))
     )
   else (st, Rerr (Rabort Rtype_error))))`;
+
 
 val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn.save_defn) evaluate_defn;
 
@@ -244,4 +244,3 @@ val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn
 
 val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn.save_defn) evaluate_decs_defn;
 val _ = export_theory()
-

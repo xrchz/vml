@@ -877,7 +877,7 @@ val _ = Define `
 val _ = Define `
  ((build_constrs:num ->(string#'a list)list ->(string#(num#stamp))list) stamp condefs=
    (MAP
-    (\ (conN, ts) . 
+    (\ (conN, ts) .
       (conN, (LENGTH ts, TypeStamp conN stamp)))
     condefs))`;
 
@@ -896,7 +896,7 @@ val _ = Define `
 (*val check_dup_ctors : list tvarN * typeN * list (conN * list ast_t) -> bool*)
 val _ = Define `
  ((check_dup_ctors:(tvarN)list#string#(string#(ast_t)list)list -> bool) (tvs, tn, condefs)=
-   (ALL_DISTINCT (let x2 = 
+   (ALL_DISTINCT (let x2 =
   ([]) in  FOLDR (\(n, ts) x2 .  if T then n :: x2 else x2) x2 condefs)))`;
 
 
@@ -914,15 +914,41 @@ val _ = Define `
  ((extend_dec_env:(v)sem_env ->(v)sem_env ->(v)sem_env) new_env env=
    (<| c := (nsAppend new_env.c env.c); v := (nsAppend new_env.v env.v) |>))`;
 
-
-(*val check_ctor_types : v -> ast_t -> maybe (list type_def) -> bool*)
 val _ = Define `
- ((check_ctor_types:v -> ast_t ->((type_def)list)option -> bool) v t tdss=
-   ((case tdss of
-      NONE => T
-    | SOME tdss => T (* TODO *)
-  )))`;
+  (con_gram_lookup_rule cenv [] = []) /\
+  (con_gram_lookup_rule cenv ((NONE,vars)::xs) =
+     (NONE,vars) :: con_gram_lookup_rule cenv xs) /\
+  (con_gram_lookup_rule cenv ((SOME name,vars)::xs) =
+     case nsLookup cenv name of
+     | NONE => con_gram_lookup_rule cenv xs
+     | SOME (arity,stamp) =>
+         (SOME (stamp:stamp),vars:string option list) :: con_gram_lookup_rule cenv xs)`
 
+val _ = Define `
+  (con_gram_lookup cenv (NONE:((((modN, conN) id) con_gram) option)) =
+     NONE:((stamp con_gram) option)) /\
+  (con_gram_lookup cenv (SOME (start, rules)) =
+     SOME (start, MAP (\(x,ys). (x,con_gram_lookup_rule cenv ys)) rules))`
+
+val MEM_IMP_v_size = prove(
+  ``!xs x. MEM x xs ==> v_size x < v7_size xs``,
+  Induct \\ fs [v_size_def] \\ rw [] \\ fs [] \\ res_tac \\ fs []);
+
+val con_gram_check_def = tDefine "con_gram_check" `
+  (con_gram_check NONE (v:v) = T) /\
+  (con_gram_check (SOME ((start,rules):stamp con_gram)) (Conv ty vs) =
+     case ALOOKUP rules start of
+     | NONE => F
+     | SOME opts =>
+        (case ALOOKUP opts ty of
+         | NONE => F
+         | SOME next => EVERY2 (\x v.
+            (case n_opt of
+             | NONE => T
+             | SOME n => con_gram_check (SOME (n,rules)) v)) next vs)) /\
+  (con_gram_check _ _ = F)`
+  (WF_REL_TAC `measure (v_size o SND)`
+   \\ rw [] \\ imp_res_tac MEM_IMP_v_size \\ fs [])
 
 (*
 val decs_to_types : list dec -> list typeN
@@ -964,4 +990,3 @@ let no_dup_top_types tops defined_types =
   disjoint (Set.fromList (List.map (fun tn -> TypeId (Short tn)) (prog_to_top_types tops))) defined_types
   *)
 val _ = export_theory()
-

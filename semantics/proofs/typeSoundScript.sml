@@ -1244,6 +1244,7 @@ Theorem exp_type_sound
          | Rerr (Rabort Rtimeout_error) => T
          | Rerr (Rabort (Rffi_error _)) => T
          | Rerr (Rabort Rtype_error) => F)`
+
  (ho_match_mp_tac evaluate_ind
  >> simp [evaluate_def, type_es_list_rel, GSYM CONJ_ASSOC, good_ctMap_def]
  >> rw []
@@ -1681,14 +1682,23 @@ Theorem exp_type_sound
    >> rw []
    >> metis_tac [type_funs_distinct])
  >- (
-   pop_assum mp_tac
-   >> simp [Once type_e_cases]
-   >> rw []
-   >> rfs [is_value_def, bind_tvar_def]
-   >> fs [PULL_EXISTS]
-   >> first_x_assum irule
-   >> rw []
-   >> metis_tac [store_type_extension_refl])
+   rename [`Tannot`]
+   \\ fs [pair_case_eq,list_case_eq,result_case_eq,bool_case_eq] \\ rveq \\ fs []
+   \\ imp_res_tac (CONJUNCT1 evaluate_length) \\ fs [PULL_EXISTS]
+   \\ fs [is_value_def]
+   \\ qpat_x_assum `type_e _ _ _ _` mp_tac
+   \\ simp [Once type_e_cases]
+   \\ TRY (
+     strip_tac
+     \\ first_x_assum match_mp_tac \\ rpt (asm_exists_tac \\ fs [])
+     \\ fs [is_value_def] \\ NO_TAC)
+   \\ CCONTR_TAC \\ fs [] \\ rveq \\ fs []
+   \\ first_x_assum (first_assum o mp_then Any mp_tac)
+   \\ fs [] \\ asm_exists_tac \\ fs []
+   \\ CCONTR_TAC \\ fs []
+   \\ Cases_on `cg` \\ fs [con_gram_lookup_def,con_gram_check_def]
+   \\ PairCases_on `x` \\ fs [con_gram_lookup_def,con_gram_check_def]
+   \\ cheat (* assum 1 should lead to contradiction *))
  >- (
    pop_assum mp_tac
    >> simp [Once type_e_cases]
