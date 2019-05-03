@@ -964,7 +964,7 @@ local
             assert(tokcheck colon ColonT);
             e <- ptree_Expr nEbefore e_pt;
             ty <- ptree_Type nType ty_pt;
-            return (Tannot e ty)
+            return (Tannot e ty (Con NONE []))
           od
         | [t] => ptree_Expr nEbefore t
         | _ => NONE

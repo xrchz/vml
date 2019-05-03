@@ -184,7 +184,7 @@ val _ = Hol_datatype `
      The first varN is the function's name, and the second varN
      is its parameter. *)
   | Letrec of (varN # varN # exp) list => exp
-  | Tannot of exp => ast_t
+  | Tannot of exp => ast_t => exp
   (* Location annotated expressions, not expected in source programs *)
   | Lannot of exp => locs`;
 

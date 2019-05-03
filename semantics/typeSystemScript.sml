@@ -477,7 +477,7 @@ val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn
 /\
 ((is_value:exp -> bool) (Fun _ _)=  T)
 /\
-((is_value:exp -> bool) (Tannot e _)=  (is_value e))
+((is_value:exp -> bool) (Tannot e _ u)=  (is_value e /\ is_value u))
 /\
 ((is_value:exp -> bool) (Lannot e _)=  (is_value e))
 /\
@@ -674,12 +674,13 @@ type_e tenv (bind_var_list(( 0 : num)) bindings tenvE) e t)
 ==>
 type_e tenv tenvE (Letrec funs e) t)
 
-/\ (! tenv tenvE e t.
+/\ (! tenv tenvE e t u.
 (check_freevars_ast [] t /\
 check_type_names tenv.t t /\
-type_e tenv tenvE e (type_name_subst tenv.t t))
+type_e tenv tenvE e (type_name_subst tenv.t t) /\
+type_e tenv tenvE u (Ttup []))
 ==>
-type_e tenv tenvE (Tannot e t) (type_name_subst tenv.t t))
+type_e tenv tenvE (Tannot e t u) (type_name_subst tenv.t t))
 
 /\ (! tenv tenvE e l t.
 (type_e tenv tenvE e t)

@@ -262,12 +262,13 @@ Theorem is_clock_io_mono_evaluate
         is_clock_io_mono (\s. evaluate_match s env v pes err_v) s)`
   (ho_match_mp_tac evaluate_ind
   \\ rpt strip_tac \\ fs [evaluate_def]
+  \\ cheat (*
   \\ rpt (FIRST ([strip_tac] @ map ho_match_mp_tac [is_clock_io_mono_bind,
         is_clock_io_mono_check]
     @ [CHANGED_TAC (fs [is_clock_io_mono_return, is_clock_io_mono_err,
             is_clock_io_mono_do_app]),
         CASE_TAC,
-        CHANGED_TAC (ho_match_mp_tac is_clock_io_mono_refs_lemma)])));
+        CHANGED_TAC (ho_match_mp_tac is_clock_io_mono_refs_lemma)])) *));
 
 Theorem is_clock_io_mono_extra
   `(!s. is_clock_io_mono f s)
@@ -849,9 +850,11 @@ Theorem evaluate_ffi_intro `
     \\ TOP_CASE_TAC \\ fs[]
     \\ strip_tac \\ rveq \\ fs[]
     \\ fs[state_component_equality] )
+
   >- (
     rfs[evaluate_def]
-    \\ rw[state_component_equality] )
+    \\ fs [pair_case_eq,result_case_eq,list_case_eq] \\ rveq \\ fs [PULL_EXISTS]
+    \\ cheat )
   >- (
     rfs[evaluate_def]
     \\ rw[state_component_equality] )

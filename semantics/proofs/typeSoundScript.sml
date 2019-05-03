@@ -1684,9 +1684,19 @@ Theorem exp_type_sound
    pop_assum mp_tac
    >> simp [Once type_e_cases]
    >> rw []
+   >> fs [pair_case_eq,list_case_eq,result_case_eq,
+          error_result_case_eq]
+   >> imp_res_tac evaluate_sing >> rveq >> fs []
+   >> imp_res_tac evaluate_sing >> rveq >> fs []
+   >> fs [is_value_def,PULL_EXISTS]
+   >> first_x_assum drule
+   >> rpt (disch_then drule)
+   >> strip_tac
+   >> TRY (Cases_on `v11`) >> fs []
+   >> rveq >> fs [PULL_EXISTS]
    >> rfs [is_value_def, bind_tvar_def]
    >> fs [PULL_EXISTS]
-   >> first_x_assum irule
+   >> TRY (first_x_assum irule)
    >> rw []
    >> metis_tac [store_type_extension_refl])
  >- (

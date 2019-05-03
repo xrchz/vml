@@ -125,10 +125,10 @@ structure astSyntax = struct
   val (Opw_tm,mk_Opw,dest_Opw,is_Opw) = s "Opw";
   val (Pcon_tm,mk_Pcon,dest_Pcon,is_Pcon) = s "Pcon";
   val (Ptannot_tm,mk_Ptannot,dest_Ptannot,is_Ptannot) = s "Ptannot";
-  val (Tannot_tm,mk_Tannot,dest_Tannot,is_Tannot) = s "Tannot";
   end
   local val s = HolKernel.syntax_fns3 "ast" in
   (* three-argument functions *)
+  val (Tannot_tm,mk_Tannot,dest_Tannot,is_Tannot) = s "Tannot";
   val (Dexn_tm,mk_Dexn,dest_Dexn,is_Dexn) = s "Dexn";
   val (Dlet_tm,mk_Dlet,dest_Dlet,is_Dlet) = s "Dlet";
   val (If_tm,mk_If,dest_If,is_If) = s "If";
