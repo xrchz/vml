@@ -69,10 +69,9 @@ Theorem do_app_call_FFI_rel
   `do_app (r,ffi) op vs = SOME ((r',ffi'),res) ⇒
    call_FFI_rel^* ffi ffi'`
   (srw_tac[][do_app_cases] >> rw[] >>
-  FULL_CASE_TAC
-  >- (match_mp_tac RTC_SUBSET >> rw[call_FFI_rel_def] >> fs[] >> every_case_tac
-      >> fs[] >> metis_tac[])
-  >- fs[]);
+   fs(List.map CaseEq ["list","v","mlstring","lit","option","store_v","ffi_result"])
+   >> match_mp_tac RTC_SUBSET >> rw[call_FFI_rel_def]
+   >> metis_tac[]);
 
 Theorem evaluate_call_FFI_rel
   `(∀(s:'ffi state) e exp.
