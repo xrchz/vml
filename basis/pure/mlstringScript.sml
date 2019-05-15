@@ -14,7 +14,12 @@ val cpn_nchotomy = TypeBase.nchotomy_of ``:ordering``
 (* Defines strings as a separate type from char list. This theory should be
    moved into HOL, either as its own theory, or as an addendum to stringTheory *)
 
-val _ = Datatype`mlstring = strlit string`
+(* The definition of the mlstring type (and strlit constructor) has been moved
+   to libTheory, so it can be used in the definition of the CakeML AST.
+   Ultimately, if mlstrings move to HOL, this may be resolved less confusingly.
+*)
+
+val _ = overload_on("strlit", ``lib$Strlit``);
 
 val implode_def = Define`
   implode = strlit`

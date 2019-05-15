@@ -25,12 +25,13 @@ val _ = new_theory "primTypes"
 (*val prim_types_program : list dec*)
 val _ = Define `
  ((prim_types_program:(dec)list)=
-   ([Dexn unknown_loc "Bind" [];
-   Dexn unknown_loc "Chr" [];
-   Dexn unknown_loc "Div" [];
-   Dexn unknown_loc "Subscript" [];
-   Dtype unknown_loc [([], "bool", [("False", []); ("True", [])])];
-   Dtype unknown_loc [(["'a"], "list", [("[]", []); ("::", [Atvar "'a"; Atapp [Atvar "'a"] (Short "list")]) ])] ]))`;
+   ([Dexn unknown_loc (Strlit "Bind") [];
+   Dexn unknown_loc (Strlit "Chr") [];
+   Dexn unknown_loc (Strlit "Div") [];
+   Dexn unknown_loc (Strlit "Subscript") [];
+   Dtype unknown_loc [([], (Strlit "bool"), [(Strlit "False", []); (Strlit "True", [])])];
+   Dtype unknown_loc [([Strlit "'a"], (Strlit "list"),
+                       [(Strlit "[]", []); (Strlit "::", [Atvar (Strlit "'a"); Atapp [Atvar (Strlit "'a")] (Short (Strlit "list"))]) ])] ]))`;
 
 
 (*val add_to_sem_env :
@@ -57,32 +58,32 @@ val _ = Define `
 val _ = Define `
  ((prim_tenv:type_env)=
      (<| c := (alist_to_ns (REVERSE
-          [("Bind", ([],[],Texn_num));
-           ("Chr", ([],[],Texn_num));
-           ("Div", ([],[],Texn_num));
-           ("Subscript", ([],[],Texn_num));
-           ("False", ([],[], Tbool_num));
-           ("True", ([],[], Tbool_num));
-           ("[]", (["'a"],[],Tlist_num));
-           ("::", (["'a"],[Tvar "'a"; Tlist (Tvar "'a")], Tlist_num))]));
+          [(Strlit "Bind", ([],[],Texn_num));
+           (Strlit "Chr", ([],[],Texn_num));
+           (Strlit "Div", ([],[],Texn_num));
+           (Strlit "Subscript", ([],[],Texn_num));
+           (Strlit "False", ([],[], Tbool_num));
+           (Strlit "True", ([],[], Tbool_num));
+           (Strlit "[]", ([Strlit "'a"],[],Tlist_num));
+           (Strlit "::", ([Strlit "'a"],[Tvar (Strlit "'a"); Tlist (Tvar (Strlit "'a"))], Tlist_num))]));
        v := nsEmpty;
        t := (alist_to_ns (REVERSE
           [
-          ("array",(["'a"],Tapp [Tvar "'a"] Tarray_num));
-          ("bool",([],Tapp [] Tbool_num));
-          ("char",([],Tapp [] Tchar_num));
-          ("exn",([],Tapp [] Texn_num));
+          (Strlit "array",([Strlit "'a"],Tapp [Tvar (Strlit "'a")] Tarray_num));
+          (Strlit "bool",([],Tapp [] Tbool_num));
+          (Strlit "char",([],Tapp [] Tchar_num));
+          (Strlit "exn",([],Tapp [] Texn_num));
           (* Tfn is ->, specially handled *)
-          ("int",([],Tapp [] Tint_num));
-          ("list",(["'a"],Tapp [Tvar "'a"] Tlist_num));
-          ("ref",(["'a"],Tapp [Tvar "'a"] Tref_num));
-          ("string",([],Tapp [] Tstring_num));
-          ("unit",([],Tapp [] Ttup_num));
+          (Strlit "int",([],Tapp [] Tint_num));
+          (Strlit "list",([Strlit "'a"],Tapp [Tvar (Strlit "'a")] Tlist_num));
+          (Strlit "ref",([Strlit "'a"],Tapp [Tvar (Strlit "'a")] Tref_num));
+          (Strlit "string",([],Tapp [] Tstring_num));
+          (Strlit "unit",([],Tapp [] Ttup_num));
           (* pairs are specially handled *)
-          ("vector",(["'a"],Tapp [Tvar "'a"] Tvector_num));
-          ("word64",([],Tapp [] Tword64_num));
-          ("word8",([],Tapp [] Tword8_num));
-          ("word8array",([],Tapp [] Tword8array_num))]
+          (Strlit "vector",([Strlit "'a"],Tapp [Tvar (Strlit "'a")] Tvector_num));
+          (Strlit "word64",([],Tapp [] Tword64_num));
+          (Strlit "word8",([],Tapp [] Tword8_num));
+          (Strlit "word8array",([],Tapp [] Tword8array_num))]
           ))|>))`;
 
 

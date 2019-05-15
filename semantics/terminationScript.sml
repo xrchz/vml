@@ -2,6 +2,7 @@
   Termination proofs for functions defined in .lem files whose termination is
   not proved automatically.
 *)
+
 open preamble intSimps;
 open libTheory astTheory open namespaceTheory semanticPrimitivesTheory typeSystemTheory;
 open evaluateTheory;
@@ -39,7 +40,7 @@ val pats_size_thm = size_thm "pats_size_thm" ``pats_size`` ``pat_size``;
 (* val envM_size_thm = size_thm "envM_size_thm" ``envM_size`` ``v5_size``; *)
 
 Theorem SUM_MAP_exp2_size_thm
-`∀defs. SUM (MAP exp2_size defs) = SUM (MAP (list_size char_size) (MAP FST defs)) +
+`∀defs. SUM (MAP exp2_size defs) = SUM (MAP mlstring_size (MAP FST defs)) +
                                           SUM (MAP exp4_size (MAP SND defs)) +
                                           LENGTH defs`
 (Induct >- rw[exp_size_def] >>
@@ -48,7 +49,7 @@ PairCases_on `p` >>
 srw_tac[ARITH_ss][exp_size_def])
 
 Theorem SUM_MAP_exp4_size_thm
-`∀ls. SUM (MAP exp4_size ls) = SUM (MAP (list_size char_size) (MAP FST ls)) +
+`∀ls. SUM (MAP exp4_size ls) = SUM (MAP mlstring_size (MAP FST ls)) +
                                       SUM (MAP exp_size (MAP SND ls)) +
                                       LENGTH ls`
 (Induct >- rw[exp_size_def] >>

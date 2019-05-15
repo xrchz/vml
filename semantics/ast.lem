@@ -23,19 +23,19 @@ type opw = Andw | Orw | Xor | Add | Sub
 type shift = Lsl | Lsr | Asr | Ror
 
 (* Module names *)
-type modN = string
+type modN = mlstring
 
 (* Variable names *)
-type varN = string
+type varN = mlstring
 
 (* Constructor names (from datatype definitions) *)
-type conN = string
+type conN = mlstring
 
 (* Type names *)
-type typeN = string
+type typeN = mlstring
 
 (* Type variable names *)
-type tvarN = string
+type tvarN = mlstring
 
 type word_size = W8 | W64
 
@@ -94,7 +94,7 @@ type op =
   (* Configure the GC *)
   | ConfigGC
   (* Call a given foreign function *)
-  | FFI of string
+  | FFI of mlstring
 
 (* Logical operations *)
 type lop =

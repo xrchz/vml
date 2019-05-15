@@ -189,7 +189,7 @@ val _ = Hol_datatype `
 (* Check that a constructor is properly applied *)
 (*val do_con_check : env_ctor -> maybe (id modN conN) -> nat -> bool*)
 val _ = Define `
- ((do_con_check:((string),(string),(num#stamp))namespace ->(((string),(string))id)option -> num -> bool) cenv n_opt l=
+ ((do_con_check:((mlstring),(mlstring),(num#stamp))namespace ->(((mlstring),(mlstring))id)option -> num -> bool) cenv n_opt l=
    ((case n_opt of
       NONE => T
     | SOME n =>
@@ -202,7 +202,7 @@ val _ = Define `
 
 (*val build_conv : env_ctor -> maybe (id modN conN) -> list v -> maybe v*)
 val _ = Define `
- ((build_conv:((string),(string),(num#stamp))namespace ->(((string),(string))id)option ->(v)list ->(v)option) envC cn vs=
+ ((build_conv:((mlstring),(mlstring),(num#stamp))namespace ->(((mlstring),(mlstring))id)option ->(v)list ->(v)option) envC cn vs=
    ((case cn of
       NONE =>
         SOME (Conv NONE vs)
@@ -267,11 +267,11 @@ val _ = Define `
 (*val pmatch : env_ctor -> store v -> pat -> v -> alist varN v -> match_result (alist varN v)*)
  val pmatch_defn = Defn.Hol_multi_defns `
 
-((pmatch:((string),(string),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(string#v)list ->((string#v)list)match_result) envC s Pany v' env=  (Match env))
+((pmatch:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s Pany v' env=  (Match env))
 /\
-((pmatch:((string),(string),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(string#v)list ->((string#v)list)match_result) envC s (Pvar x) v' env=  (Match ((x,v')::env)))
+((pmatch:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s (Pvar x) v' env=  (Match ((x,v')::env)))
 /\
-((pmatch:((string),(string),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(string#v)list ->((string#v)list)match_result) envC s (Plit l) (Litv l') env=
+((pmatch:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s (Plit l) (Litv l') env=
    (if l = l' then
     Match env
   else if lit_same_type l l' then
@@ -279,7 +279,7 @@ val _ = Define `
   else
     Match_type_error))
 /\
-((pmatch:((string),(string),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(string#v)list ->((string#v)list)match_result) envC s (Pcon (SOME n) ps) (Conv (SOME stamp') vs) env=
+((pmatch:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s (Pcon (SOME n) ps) (Conv (SOME stamp') vs) env=
    ((case nsLookup envC n of
       SOME (l,stamp) =>
         if same_type stamp stamp' /\ (LENGTH ps = l) then
@@ -295,41 +295,41 @@ val _ = Define `
     | _ => Match_type_error
   )))
 /\
-((pmatch:((string),(string),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(string#v)list ->((string#v)list)match_result) envC s (Pcon NONE ps) (Conv NONE vs) env=
+((pmatch:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s (Pcon NONE ps) (Conv NONE vs) env=
    (if LENGTH ps = LENGTH vs then
     pmatch_list envC s ps vs env
   else
     Match_type_error))
 /\
-((pmatch:((string),(string),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(string#v)list ->((string#v)list)match_result) envC s (Pref p) (Loc lnum) env=
+((pmatch:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s (Pref p) (Loc lnum) env=
    ((case store_lookup lnum s of
       SOME (Refv v) => pmatch envC s p v env
     | SOME _ => Match_type_error
     | NONE => Match_type_error
   )))
 /\
-((pmatch:((string),(string),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(string#v)list ->((string#v)list)match_result) envC s (Ptannot p t) v env=
+((pmatch:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s (Ptannot p t) v env=
    (pmatch envC s p v env))
 /\
-((pmatch:((string),(string),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(string#v)list ->((string#v)list)match_result) envC _ _ _ env=  Match_type_error)
+((pmatch:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list -> pat -> v ->(mlstring#v)list ->((mlstring#v)list)match_result) envC _ _ _ env=  Match_type_error)
 /\
-((pmatch_list:((string),(string),(num#stamp))namespace ->((v)store_v)list ->(pat)list ->(v)list ->(string#v)list ->((string#v)list)match_result) envC s [] [] env=  (Match env))
+((pmatch_list:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list ->(pat)list ->(v)list ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s [] [] env=  (Match env))
 /\
-((pmatch_list:((string),(string),(num#stamp))namespace ->((v)store_v)list ->(pat)list ->(v)list ->(string#v)list ->((string#v)list)match_result) envC s (p::ps) (v::vs) env=
+((pmatch_list:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list ->(pat)list ->(v)list ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s (p::ps) (v::vs) env=
    ((case pmatch envC s p v env of
       No_match => No_match
     | Match_type_error => Match_type_error
     | Match env' => pmatch_list envC s ps vs env'
   )))
 /\
-((pmatch_list:((string),(string),(num#stamp))namespace ->((v)store_v)list ->(pat)list ->(v)list ->(string#v)list ->((string#v)list)match_result) envC s _ _ env=  Match_type_error)`;
+((pmatch_list:((mlstring),(mlstring),(num#stamp))namespace ->((v)store_v)list ->(pat)list ->(v)list ->(mlstring#v)list ->((mlstring#v)list)match_result) envC s _ _ env=  Match_type_error)`;
 
 val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn.save_defn) pmatch_defn;
 
 (* Bind each function of a mutually recursive set of functions to its closure *)
 (*val build_rec_env : list (varN * varN * exp) -> sem_env v -> env_val -> env_val*)
 val _ = Define `
- ((build_rec_env:(varN#varN#exp)list ->(v)sem_env ->((string),(string),(v))namespace ->((string),(string),(v))namespace) funs cl_env add_to_env=
+ ((build_rec_env:(varN#varN#exp)list ->(v)sem_env ->((mlstring),(mlstring),(v))namespace ->((mlstring),(mlstring),(v))namespace) funs cl_env add_to_env=
    (FOLDR
     (\ (f,x,e) env' .  nsBind f (Recclosure cl_env funs f) env')
     add_to_env
@@ -339,7 +339,7 @@ val _ = Define `
 (* Lookup in the list of mutually recursive functions *)
 (*val find_recfun : forall 'a 'b. varN -> list (varN * 'a * 'b) -> maybe ('a * 'b)*)
  val _ = Define `
- ((find_recfun:string ->(string#'a#'b)list ->('a#'b)option) n funs=
+ ((find_recfun:mlstring ->(mlstring#'a#'b)list ->('a#'b)option) n funs=
    ((case funs of
       [] => NONE
     | (f,x,e) :: funs =>
@@ -428,12 +428,12 @@ val _ = Define `
 (*val v_to_list : v -> maybe (list v)*)
  val v_to_list_defn = Defn.Hol_multi_defns `
  ((v_to_list:v ->((v)list)option) (Conv (SOME stamp) [])=
-   (if stamp = TypeStamp "[]" list_type_num then
+   (if stamp = TypeStamp (Strlit "[]") list_type_num then
     SOME []
   else
     NONE))
 /\ ((v_to_list:v ->((v)list)option) (Conv (SOME stamp) [v1;v2])=
-   (if stamp = TypeStamp "::" list_type_num then
+   (if stamp = TypeStamp (Strlit "::") list_type_num then
     (case v_to_list v2 of
         SOME vs => SOME (v1::vs)
       | NONE => NONE
@@ -446,20 +446,20 @@ val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn
 
 (*val list_to_v : list v -> v*)
  val list_to_v_defn = Defn.Hol_multi_defns `
- ((list_to_v:(v)list -> v) []=  (Conv (SOME (TypeStamp "[]" list_type_num)) []))
-/\ ((list_to_v:(v)list -> v) (x::xs)=  (Conv (SOME (TypeStamp "::" list_type_num)) [x; list_to_v xs]))`;
+ ((list_to_v:(v)list -> v) []=  (Conv (SOME (TypeStamp (Strlit "[]") list_type_num)) []))
+/\ ((list_to_v:(v)list -> v) (x::xs)=  (Conv (SOME (TypeStamp (Strlit "::") list_type_num)) [x; list_to_v xs]))`;
 
 val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn.save_defn) list_to_v_defn;
 
 (*val v_to_char_list : v -> maybe (list char)*)
  val v_to_char_list_defn = Defn.Hol_multi_defns `
  ((v_to_char_list:v ->((char)list)option) (Conv (SOME stamp) [])=
-   (if stamp = TypeStamp "[]" list_type_num then
+   (if stamp = TypeStamp (Strlit "[]") list_type_num then
     SOME []
   else
     NONE))
 /\ ((v_to_char_list:v ->((char)list)option) (Conv (SOME stamp) [Litv (Char c);v])=
-   (if stamp = TypeStamp "::" list_type_num then
+   (if stamp = TypeStamp (Strlit "::") list_type_num then
     (case v_to_char_list v of
         SOME cs => SOME (c::cs)
       | NONE => NONE
@@ -573,8 +573,8 @@ val _ = Define `
 (*val Boolv : bool -> v*)
 val _ = Define `
  ((Boolv:bool -> v) b=  (if b
-  then Conv (SOME (TypeStamp "True" bool_type_num)) []
-  else Conv (SOME (TypeStamp "False" bool_type_num)) []))`;
+  then Conv (SOME (TypeStamp (Strlit "True") bool_type_num)) []
+  else Conv (SOME (TypeStamp (Strlit "False") bool_type_num)) []))`;
 
 
 val _ = Hol_datatype `
@@ -830,7 +830,7 @@ val _ = Define `
       )
     | (ConfigGC, [Litv (IntLit i); Litv (IntLit j)]) =>
         SOME ((s,t), Rval (Conv NONE []))
-    | (FFI n, [Litv(StrLit conf); Loc lnum]) =>
+    | (FFI (Strlit n), [Litv(StrLit conf); Loc lnum]) =>
         (case store_lookup lnum s of
           SOME (W8array ws) =>
             (case call_FFI t n (MAP (\ c .  n2w(ORD c)) (EXPLODE conf)) ws of
@@ -875,7 +875,7 @@ val _ = Define `
 (* Semantic helpers for definitions *)
 
 val _ = Define `
- ((build_constrs:num ->(string#'a list)list ->(string#(num#stamp))list) stamp condefs=
+ ((build_constrs:num ->(mlstring#'a list)list ->(mlstring#(num#stamp))list) stamp condefs=
    (MAP
     (\ (conN, ts) . 
       (conN, (LENGTH ts, TypeStamp conN stamp)))
@@ -885,8 +885,8 @@ val _ = Define `
 (* Build a constructor environment for the type definition tds *)
 (*val build_tdefs : nat -> list (list tvarN * typeN * list (conN * list ast_t)) -> env_ctor*)
  val _ = Define `
- ((build_tdefs:num ->((tvarN)list#string#(string#(ast_t)list)list)list ->((string),(string),(num#stamp))namespace) next_stamp []=  (alist_to_ns []))
-/\ ((build_tdefs:num ->((tvarN)list#string#(string#(ast_t)list)list)list ->((string),(string),(num#stamp))namespace) next_stamp ((tvs,tn,condefs)::tds)=
+ ((build_tdefs:num ->((tvarN)list#mlstring#(mlstring#(ast_t)list)list)list ->((mlstring),(mlstring),(num#stamp))namespace) next_stamp []=  (alist_to_ns []))
+/\ ((build_tdefs:num ->((tvarN)list#mlstring#(mlstring#(ast_t)list)list)list ->((mlstring),(mlstring),(num#stamp))namespace) next_stamp ((tvs,tn,condefs)::tds)=
    (nsAppend
     (build_tdefs (next_stamp +( 1 : num)) tds)
     (alist_to_ns (REVERSE (build_constrs next_stamp condefs)))))`;
@@ -895,7 +895,7 @@ val _ = Define `
 (* Checks that no constructor is defined twice in a type *)
 (*val check_dup_ctors : list tvarN * typeN * list (conN * list ast_t) -> bool*)
 val _ = Define `
- ((check_dup_ctors:(tvarN)list#string#(string#(ast_t)list)list -> bool) (tvs, tn, condefs)=
+ ((check_dup_ctors:(tvarN)list#mlstring#(mlstring#(ast_t)list)list -> bool) (tvs, tn, condefs)=
    (ALL_DISTINCT (let x2 = 
   ([]) in  FOLDR (\(n, ts) x2 .  if T then n :: x2 else x2) x2 condefs)))`;
 

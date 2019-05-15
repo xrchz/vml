@@ -14,6 +14,10 @@ val _ = new_theory "lib"
 
 (*open import Pervasives*)
 
+val _ = Hol_datatype `
+ mlstring = Strlit of string`;
+
+
 (* TODO: look for these in the built-in library *)
 
 (*val rtc : forall 'a. ('a -> 'a -> bool) -> ('a -> 'a -> bool)*)

@@ -45,19 +45,19 @@ val _ = Hol_datatype `
 
 
 (* Module names *)
-val _ = type_abbrev( "modN" , ``: string``);
+val _ = type_abbrev( "modN" , ``: mlstring``);
 
 (* Variable names *)
-val _ = type_abbrev( "varN" , ``: string``);
+val _ = type_abbrev( "varN" , ``: mlstring``);
 
 (* Constructor names (from datatype definitions) *)
-val _ = type_abbrev( "conN" , ``: string``);
+val _ = type_abbrev( "conN" , ``: mlstring``);
 
 (* Type names *)
-val _ = type_abbrev( "typeN" , ``: string``);
+val _ = type_abbrev( "typeN" , ``: mlstring``);
 
 (* Type variable names *)
-val _ = type_abbrev( "tvarN" , ``: string``);
+val _ = type_abbrev( "tvarN" , ``: mlstring``);
 
 val _ = Hol_datatype `
  word_size = W8 | W64`;
@@ -119,7 +119,7 @@ val _ = Hol_datatype `
   (* Configure the GC *)
   | ConfigGC
   (* Call a given foreign function *)
-  | FFI of string`;
+  | FFI of mlstring`;
 
 
 (* Logical operations *)
@@ -232,28 +232,28 @@ type specs = list spec
 (*val pat_bindings : pat -> list varN -> list varN*)
  val pat_bindings_defn = Defn.Hol_multi_defns `
 
-((pat_bindings:pat ->(string)list ->(string)list) Pany already_bound=
+((pat_bindings:pat ->(mlstring)list ->(mlstring)list) Pany already_bound=
    already_bound)
 /\
-((pat_bindings:pat ->(string)list ->(string)list) (Pvar n) already_bound=
+((pat_bindings:pat ->(mlstring)list ->(mlstring)list) (Pvar n) already_bound=
    (n::already_bound))
 /\
-((pat_bindings:pat ->(string)list ->(string)list) (Plit l) already_bound=
+((pat_bindings:pat ->(mlstring)list ->(mlstring)list) (Plit l) already_bound=
    already_bound)
 /\
-((pat_bindings:pat ->(string)list ->(string)list) (Pcon _ ps) already_bound=
+((pat_bindings:pat ->(mlstring)list ->(mlstring)list) (Pcon _ ps) already_bound=
    (pats_bindings ps already_bound))
 /\
-((pat_bindings:pat ->(string)list ->(string)list) (Pref p) already_bound=
+((pat_bindings:pat ->(mlstring)list ->(mlstring)list) (Pref p) already_bound=
    (pat_bindings p already_bound))
 /\
-((pat_bindings:pat ->(string)list ->(string)list) (Ptannot p _) already_bound=
+((pat_bindings:pat ->(mlstring)list ->(mlstring)list) (Ptannot p _) already_bound=
    (pat_bindings p already_bound))
 /\
-((pats_bindings:(pat)list ->(string)list ->(string)list) [] already_bound=
+((pats_bindings:(pat)list ->(mlstring)list ->(mlstring)list) [] already_bound=
    already_bound)
 /\
-((pats_bindings:(pat)list ->(string)list ->(string)list) (p::ps) already_bound=
+((pats_bindings:(pat)list ->(mlstring)list ->(mlstring)list) (p::ps) already_bound=
    (pats_bindings ps (pat_bindings p already_bound)))`;
 
 val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn.save_defn) pat_bindings_defn;
