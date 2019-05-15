@@ -3,11 +3,8 @@
   check that the conversion functions are doing something reasonable.
   TODO: check this description is correct
 *)
-open HolKernel Parse boolLib bossLib;
-open lcsymtacs preamble boolSimps
 
-open cmlPtreeConversionTheory
-open gramPropsTheory
+open preamble cmlPtreeConversionTheory gramPropsTheory
 
 val _ = new_theory "cmlPtreeConversionProps";
 val _ = set_grammar_ancestry ["cmlPtreeConversion", "gramProps"]
@@ -26,25 +23,39 @@ val _ = augment_srw_ss [rewrites [user_expressible_tyname_def]]
 val _ = temp_overload_on ("ND", “λn. Nd (mkNT n, ARB)”)
 val _ = temp_overload_on ("LF", “λt. Lf (TOK t, ARB)”)
 val tyname_to_AST_def = Define‘
-  tyname_to_AST (Short n) = ND nTyOp [ND nUQTyOp [LF (AlphaT n)]] ∧
-  tyname_to_AST (Long md (Short n)) = ND nTyOp [LF (LongidT md n)] ∧
+  tyname_to_AST (Short (Strlit n)) = ND nTyOp [ND nUQTyOp [LF (AlphaT n)]] ∧
+  tyname_to_AST (Long (Strlit md) (Short (Strlit n))) = ND nTyOp [LF (LongidT md n)] ∧
   tyname_to_AST _ = ARB
 ’;
+
+val mlstring_ty = Type.mk_thy_type{Args=[],Thy="lib",Tyop="mlstring"};
+
+fun mlstring_Cases_on_term tm =
+  let
+    fun pred tm = type_of tm = mlstring_ty andalso is_var tm
+    val tms = HOLset.fromList Term.compare (HolKernel.find_terms pred tm)
+    fun Cases_tac tm = bossLib.Cases_on [ANTIQUOTE tm]
+  in
+    EVERY (List.map Cases_tac (HOLset.listItems tms))
+  end
+
+fun mlstringFullCases (g as (asl,w)) =
+  EVERY (List.map mlstring_Cases_on_term (w::asl)) g
 
 Theorem tyname_inverted
   `∀id. user_expressible_tyname id ⇒
         ptree_Tyop (tyname_to_AST id) = SOME id`
-  (Cases >>
+  (Cases >> mlstringFullCases >>
   simp[ptree_Tyop_def, tyname_to_AST_def, ptree_UQTyop_def] >>
-  rename [‘Long m j’] >> Cases_on ‘j’ >>
+  rename [‘Long _ j’] >> Cases_on ‘j’ >> mlstringFullCases >>
   simp[ptree_Tyop_def, tyname_to_AST_def, ptree_UQTyop_def]);
 
 Theorem tyname_validptree
   `∀id. user_expressible_tyname id ⇒
           valid_ptree cmlG (tyname_to_AST id) ∧
           ptree_head (tyname_to_AST id) = NN nTyOp`
-  (Cases >> simp[tyname_to_AST_def, cmlG_FDOM, cmlG_applied] >>
-  rename [‘Long m j’] >> Cases_on ‘j’ >>
+  (Cases >> mlstringFullCases >> simp[tyname_to_AST_def, cmlG_FDOM, cmlG_applied] >>
+  rename [‘Long _ j’] >> Cases_on ‘j’ >> mlstringFullCases >>
   simp[tyname_to_AST_def, cmlG_applied, cmlG_FDOM]);
 
 
@@ -64,7 +75,7 @@ val _ = augment_srw_ss [rewrites [
            SIMP_RULE (srw_ss() ++ ETA_ss) [] user_expressible_type_def]]
 
 val type_to_AST_def = tDefine "type_to_AST" ‘
-  type_to_AST (Atvar s) (* : (token,MMLnonT,unit) parsetree *) =
+  type_to_AST (Atvar (Strlit s)) (* : (token,MMLnonT,unit) parsetree *) =
     ND nType [ND nPType [ND nDType [ND nTbase [LF (TyvarT s)]]]] ∧
   (type_to_AST (Atfun dty rty) =
    ND nType [
@@ -126,8 +137,8 @@ val type_to_AST_def = tDefine "type_to_AST" ‘
 
 Theorem destTyvarPT_tyname_to_AST
   `∀i. user_expressible_tyname i ⇒ destTyvarPT (tyname_to_AST i) = NONE`
-  (Cases >> simp[tyname_to_AST_def] >>
-  rename [‘Long _ j’] >> Cases_on ‘j’ >>
+  (Cases >> mlstringFullCases >> simp[tyname_to_AST_def] >>
+  rename [‘Long _ j’] >> Cases_on ‘j’ >> mlstringFullCases >>
   simp[tyname_to_AST_def]);
 
 val _ = temp_type_abbrev ("PT", “:(token,MMLnonT,α) parsetree”);
@@ -537,7 +548,7 @@ Theorem PTbase_OK
   (start >> fs[MAP_EQ_APPEND, FORALL_AND_THM, DISJ_IMP_THM] >> rveq >>
   simp[ptree_PTbase_def, tokcheck_def]
   >- (erule strip_assume_tac (n TyOp_OK) >> simp[] >>
-      rename [‘destTyvarPT pt’] >> Cases_on ‘OPTION_MAP Atvar (destTyvarPT pt)’ >>
+      rename [‘destTyvarPT pt’] >> Cases_on ‘OPTION_MAP (Atvar o Strlit) (destTyvarPT pt)’ >>
       simp[]) >>
   metis_tac[Type_OK]);
 
