@@ -237,22 +237,22 @@ Theorem encode_decode_control
   metis_tac[isLower_isAlpha, isAlpha_isUpper_isLower])
 
 val SEXSTR_def = Define`
-  SEXSTR s = SX_STR (encode_control s)`;
+  SEXSTR (Strlit s) = SX_STR (encode_control s)`;
 
 Theorem SEXSTR_11[simp]
   `SEXSTR s1 = SEXSTR s2 ⇔ s1 = s2`
-  (rw[SEXSTR_def]
+  (Cases_on`s1` \\ Cases_on`s2` \\ rw[SEXSTR_def]
   \\ metis_tac[decode_encode_control,SOME_11]);
 
 Theorem SEXSTR_distinct[simp]
-  `(SEXSTR s ≠ SX_SYM sym) ∧
-   (SEXSTR s ≠ SX_NUM num) ∧
-   (SEXSTR s ≠ SX_CONS a d) ∧
-   ((SEXSTR s = SX_STR s') ⇔ s' = encode_control s)`
-  (rw[SEXSTR_def,EQ_IMP_THM]);
+  `(SEXSTR m ≠ SX_SYM sym) ∧
+   (SEXSTR m ≠ SX_NUM num) ∧
+   (SEXSTR m ≠ SX_CONS a d) ∧
+   ((SEXSTR (Strlit s) = SX_STR s') ⇔ s' = encode_control s)`
+  (Cases_on`m` \\ rw[SEXSTR_def,EQ_IMP_THM]);
 
 val odestSEXSTR_def = Define`
-  (odestSEXSTR (SX_STR s) = decode_control s) ∧
+  (odestSEXSTR (SX_STR s) = OPTION_MAP Strlit (decode_control s)) ∧
   (odestSEXSTR _ = NONE)`;
 
 Theorem encode_control_remove
@@ -260,7 +260,7 @@ Theorem encode_control_remove
   (Induct \\ simp[encode_control_def]);
 
 Theorem SEXSTR_remove
-  `EVERY isPrint s ∧ #"\\" ∉ set s ⇒ SEXSTR s = SX_STR s`
+  `EVERY isPrint s ∧ #"\\" ∉ set s ⇒ SEXSTR (Strlit s) = SX_STR s`
   (rw[SEXSTR_def,encode_control_remove]);
 
 val odestSXSTR_def = Define`
@@ -439,17 +439,18 @@ Theorem sexptype_alt_intro1
   `sexptype = sexptype_alt ∧ sexplist sexptype = sexptype_list`
   (rw[FUN_EQ_THM,sexptype_alt_intro]);
 
+
 val sexplit_def = Define`
   sexplit s =
     lift (IntLit o (&)) (odestSXNUM s) ++
-    lift StrLit (odestSEXSTR s) ++
+    lift StrLit (OPTION_BIND (odestSXSTR s) decode_control) ++
     do
       (nm,args) <- dstrip_sexp s;
       assert(LENGTH args = 1);
       guard (nm = "-") (OPTION_BIND (odestSXNUM (HD args)) (λn. if n = 0 then NONE else SOME (IntLit (-&n)))) ++
       guard (nm = "char")
             do
-              cs <- odestSEXSTR (HD args);
+              cs <- OPTION_BIND (odestSXSTR (HD args)) decode_control;
               assert(LENGTH cs = 1);
               return (Char (HD cs))
             od ++
@@ -621,9 +622,6 @@ val sexpop_def = Define`
   if s = "Alength" then SOME Alength else
   if s = "Aupdate" then SOME Aupdate else
   if s = "ConfigGC" then SOME ConfigGC else NONE) ∧
-  (sexpop (SX_CONS (SX_SYM s) (SX_STR s')) =
-     if s = "FFI" then OPTION_MAP FFI (decode_control s') else NONE
-   ) ∧
   (sexpop (SX_CONS (SX_SYM s) (SX_NUM n)) =
     if s = "Shift8Lsl" then SOME (Shift W8 Lsl n) else
     if s = "Shift8Lsr" then SOME (Shift W8 Lsr n) else
@@ -633,6 +631,8 @@ val sexpop_def = Define`
     if s = "Shift64Lsr" then SOME (Shift W64 Lsr n) else
     if s = "Shift64Asr" then SOME (Shift W64 Asr n) else
     if s = "Shift64Ror" then SOME (Shift W64 Ror n) else NONE) ∧
+  (sexpop (SX_CONS (SX_SYM s) s') =
+     if s = "FFI" then OPTION_MAP FFI (odestSEXSTR s') else NONE) ∧
   (sexpop _ = NONE)`;
 
 val sexplop_def = Define`
@@ -1063,8 +1063,8 @@ val litsexp_def = Define`
   (litsexp (IntLit i) =
    if i < 0 then listsexp [SX_SYM "-"; SX_NUM (Num(-i))]
             else SX_NUM (Num i)) ∧
-  (litsexp (Char c) = listsexp [SX_SYM "char"; SEXSTR [c]]) ∧
-  (litsexp (StrLit s) = SEXSTR s) ∧
+  (litsexp (Char c) = listsexp [SX_SYM "char"; SEXSTR (Strlit [c])]) ∧
+  (litsexp (StrLit s) = SEXSTR (Strlit s)) ∧
   (litsexp (Word8 w) = listsexp [SX_SYM "word8"; SX_NUM (w2n w)]) ∧
   (litsexp (Word64 w) = listsexp [SX_SYM "word64"; SX_NUM (w2n w)])`;
 
@@ -1197,7 +1197,7 @@ Theorem sexpop_opsexp[simp]
       ] >>
       Cases_on`c1` >> rw[sexpop_def,opsexp_def] >>
       Cases_on`c2` >> rw[sexpop_def,opsexp_def]) >>
-  rw[sexpop_def,opsexp_def,SEXSTR_def])
+  Cases_on`m` \\ rw[sexpop_def,SEXSTR_def,odestSEXSTR_def]);
 
 Theorem opsexp_11[simp]
   `∀o1 o2. opsexp o1 = opsexp o2 ⇔ o1 = o2`
@@ -1321,7 +1321,7 @@ Theorem odestSXSTR_SOME[simp]
 
 Theorem odestSEXSTR_SOME[simp]
   `odestSEXSTR s = SOME y ⇔ (s = SEXSTR y)`
-  (Cases_on`s`\\simp[odestSEXSTR_def,SEXSTR_def]
+  (Cases_on`s`\\Cases_on`y`\\simp[odestSEXSTR_def,SEXSTR_def]
   \\ metis_tac[decode_encode_control,encode_decode_control]);
 
 Theorem odestSXSTR_SX_STR[simp]
@@ -1346,7 +1346,7 @@ Theorem odestSXNUM_SX_STR[simp]
 
 Theorem odestSXNUM_SEXSTR[simp]
   `odestSXNUM (SEXSTR s) = NONE`
-  (EVAL_TAC)
+  (Cases_on`s` \\ EVAL_TAC)
 
 Theorem odestSXSTR_listsexp[simp]
   `odestSXSTR (listsexp l) = NONE`
@@ -1366,7 +1366,7 @@ Theorem dstrip_sexp_SX_STR[simp]
 
 Theorem dstrip_sexp_SEXSTR[simp]
   `dstrip_sexp (SEXSTR s) = NONE`
-  (EVAL_TAC)
+  (Cases_on`s` \\ EVAL_TAC)
 
 Theorem strip_sxcons_listsexp[simp]
   `strip_sxcons (listsexp ls) = SOME ls`
@@ -1566,12 +1566,14 @@ Theorem litsexp_sexplit
     rw[litsexp_def]
     \\ Cases_on`s` \\ fs[odestSXNUM_def] )
   \\ reverse(Cases_on`odestSEXSTR s`) \\ fs[]
-  >- ( rw[litsexp_def])
+  >- ( rw[litsexp_def] \\ Cases_on`x` \\ fs[] \\ rw[] \\ fs[])
+  \\ Cases_on`odestSXSTR s` \\ fs[litsexp_def] \\ rw[] \\ fs[odestSEXSTR_def]
   \\ pairarg_tac
   \\ fs[quantHeuristicsTheory.LIST_LENGTH_3] \\ rw[]
   \\ fs[OPTION_CHOICE_EQ_SOME, dstrip_sexp_EQ_SOME] >>
-  rw[litsexp_def, listsexp_def]
-  \\ Cases_on`e1` \\ fs[odestSXNUM_def]);
+  rw[litsexp_def, listsexp_def] \\ fs[odestSEXSTR_def]
+  \\ TRY(Cases_on`e1` \\ fs[odestSXNUM_def])
+  \\ imp_res_tac encode_decode_control);
 
 Theorem idsexp_sexpid_odestSEXSTR
   `∀y x. sexpid odestSEXSTR x = SOME y ⇒ x = idsexp y`
@@ -1807,7 +1809,7 @@ Theorem decsexp_sexpdec
 
 Theorem SEXSTR_valid[simp]
   `valid_sexp (SEXSTR s)`
-  (rw[SEXSTR_def,EVERY_isPrint_encode_control]);
+  (Cases_on`s` \\ rw[SEXSTR_def,EVERY_isPrint_encode_control]);
 
 Theorem listsexp_valid
   `∀ls. EVERY valid_sexp ls ⇒ valid_sexp (listsexp ls)`
