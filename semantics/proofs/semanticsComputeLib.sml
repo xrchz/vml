@@ -104,6 +104,7 @@ val add_ast_compset = computeLib.extend_compset
     ,``:eq_result``
     ,``:'a sem_env``
     ,``:ast$ast_t``
+    ,``:lib$mlstring``
     ]]
 
 val add_lexparse_compset = computeLib.extend_compset
