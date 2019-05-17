@@ -3,13 +3,14 @@
     translator. The theorems about Eval serve as an interface between
     the source semantics and the translator's automation.
 *)
+
 open integerTheory ml_progTheory
      astTheory libTheory semanticPrimitivesTheory
      semanticPrimitivesPropsTheory evaluatePropsTheory;
 open mlvectorTheory mlstringTheory packLib;
 open integer_wordSyntax
 open terminationTheory
-local open integer_wordSyntax in end;
+local open integer_wordSyntax semanticPrimitivesSyntax in end;
 open preamble;
 
 val _ = new_theory "ml_translator";
@@ -691,17 +692,17 @@ local
 
 val th0 = Q.SPEC `0` Eval_Val_INT
 val th_sub = MATCH_MP (MATCH_MP Eval_INT_SUB (Q.SPEC `0` Eval_Val_INT))
-            (ASSUME ``Eval env (Var (Short "k")) (INT k)``)
-val th1 = ASSUME ``Eval env (Var (Short "k")) (INT k)``
+            (ASSUME ``Eval env (Var (Short (strlit "k"))) (INT k)``)
+val th1 = ASSUME ``Eval env (Var (Short (strlit "k"))) (INT k)``
 val th2 = Eval_INT_LESS  |> Q.SPECL [`k`,`0`]
           |> (fn th => MATCH_MP th th1) |> (fn th => MATCH_MP th th0)
 val th = MATCH_MP Eval_If (LIST_CONJ (map (DISCH T) [th2,th_sub,th1]))
          |> REWRITE_RULE [CONTAINER_def]
 val code =
-  ``Let (SOME "k") x1
-       (If (App (Opb Lt) [Var (Short "k"); Lit (IntLit 0)])
-          (App (Opn Minus) [Lit (IntLit 0); Var (Short "k")])
-          (Var (Short "k")))``
+  ``Let (SOME (strlit "k")) x1
+       (If (App (Opb Lt) [Var (Short (strlit "k")); Lit (IntLit 0)])
+          (App (Opn Minus) [Lit (IntLit 0); Var (Short (strlit "k"))])
+          (Var (Short (strlit "k"))))``
 
 in
 
@@ -800,15 +801,15 @@ val Eval_NUM_MULT =
 local
 
 val th0 = Q.SPEC `0` Eval_Val_INT
-val th1 = ASSUME ``Eval env (Var (Short "k")) (INT k)``
+val th1 = ASSUME ``Eval env (Var (Short (strlit "k"))) (INT k)``
 val th2 = Eval_INT_LESS  |> Q.SPECL [`k`,`0`]
           |> (fn th => MATCH_MP th th1) |> (fn th => MATCH_MP th th0)
 val th = MATCH_MP Eval_If (LIST_CONJ (map (DISCH T) [th2,th0,th1]))
          |> REWRITE_RULE [CONTAINER_def]
 val code =
-  ``Let (SOME "k") (App (Opn Minus) [x1; x2])
-      (If (App (Opb Lt) [Var (Short "k"); Lit (IntLit 0)])
-          (Lit (IntLit 0)) (Var (Short "k"))): exp``
+  ``Let (SOME (strlit "k")) (App (Opn Minus) [x1; x2])
+      (If (App (Opb Lt) [Var (Short (strlit "k")); Lit (IntLit 0)])
+          (Lit (IntLit 0)) (Var (Short (strlit "k")))): exp``
 
 in
 
@@ -993,10 +994,10 @@ Theorem Eval_w2n
 
 local
   val lemma = Q.prove(
-    `(∀v. NUM (w2n w) v ⇒ Eval (write "x" v env)
-                 (If (App (Opb Lt) [Var (Short "x"); Lit (IntLit (& k))])
-                    (Var (Short "x"))
-                    (App (Opn Minus) [Var (Short "x"); Lit (IntLit (& d))]))
+    `(∀v. NUM (w2n w) v ⇒ Eval (write (strlit "x") v env)
+                 (If (App (Opb Lt) [Var (Short (strlit "x")); Lit (IntLit (& k))])
+                    (Var (Short (strlit "x")))
+                    (App (Opn Minus) [Var (Short (strlit "x")); Lit (IntLit (& d))]))
         (INT ((\n. if n < k then &n else &n - &d) (w2n w))))`,
     fs [] \\ rpt strip_tac
     \\ match_mp_tac (MP_CANON Eval_If |> GEN_ALL)
@@ -1214,11 +1215,11 @@ val LIST_TYPE_def = Define `
   (!a x_2 x_1 v.
      LIST_TYPE a (x_2::x_1) v <=>
      ?v2_1 v2_2.
-       v = Conv (SOME (TypeStamp "::" 1)) [v2_1; v2_2] /\
+       v = Conv (SOME (TypeStamp (strlit "::") 1)) [v2_1; v2_2] /\
        a x_2 v2_1 /\ LIST_TYPE a x_1 v2_2) /\
   !a v.
      LIST_TYPE a [] v <=>
-     v = Conv (SOME (TypeStamp "[]" 1)) []`
+     v = Conv (SOME (TypeStamp (strlit "[]") 1)) []`
 
 val LIST_TYPE_SIMP' = Q.prove(
   `!xs b. CONTAINER LIST_TYPE
@@ -1534,16 +1535,16 @@ val two_pow_64 = EVAL ``2i**64`` |> concl |> rand
 
 Theorem Eval_force_out_of_memory_error
    `Eval env x (a i) ==>
-    Eval env (Let (SOME "a") x
-             (Let (SOME "n") (Lit (IntLit ^two_pow_64))
-             (Let NONE (App Aalloc [Var (Short "n"); Var (Short "n")])
-               (Var (Short "a"))))) (a (force_out_of_memory_error i))`
+    Eval env (Let (SOME (strlit "a")) x
+             (Let (SOME (strlit "n")) (Lit (IntLit ^two_pow_64))
+             (Let NONE (App Aalloc [Var (Short (strlit "n")); Var (Short (strlit "n"))])
+               (Var (Short (strlit "a")))))) (a (force_out_of_memory_error i))`
   (tac1 \\ fs [namespaceTheory.nsOptBind_def,store_alloc_def,
                force_out_of_memory_error_def]);
 
 Theorem Eval_empty_ffi
   `Eval env x (STRING_TYPE s) ==>
-   Eval env (App (FFI "") [x; App Aw8alloc [Lit (IntLit 0); Lit (Word8 0w)]])
+   Eval env (App (FFI (strlit "")) [x; App Aw8alloc [Lit (IntLit 0); Lit (Word8 0w)]])
      (UNIT_TYPE (empty_ffi s))`
   (rw[Eval_rw,WORD_def] \\ fs [store_alloc_def,do_app_def]
   \\ first_x_assum (qspec_then `refs ++ [W8array []]` mp_tac) \\ strip_tac
@@ -2164,7 +2165,7 @@ val translator_terms = save_thm("translator_terms",
      ("exists pat",``EXISTS (f:'a->bool)``),
      ("n = 0",``(n = (0:num))``),
      ("0 = n",``(0 = (n:num))``),
-     ("bind",``(Con(SOME(Short"Bind")) [])``),
+     ("bind",``(Con(SOME(Short(strlit"Bind"))) [])``),
      ("eq arrow",``Eq (a:'a->v->bool) x --> (b:'b->v->bool)``),
      ("arrow eq",``Arrow (Eq a (x:'a)) (b:'b->v->bool)``),
      ("precond = T",``!b. PRECONDITION b = T``),

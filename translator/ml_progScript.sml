@@ -539,8 +539,8 @@ Theorem ML_code_new_block
 Theorem ML_code_close_module
   `ML_code inp_env ((("Module", mn), m_i_st, m_decls, m_env)
         :: (comm, st, decls, env) :: bls) st2
-    ==> let env2 = write_mod mn m_env env
-        in ML_code inp_env ((comm, st, SNOC (Dmod mn m_decls) decls,
+    ==> let env2 = write_mod (strlit mn) m_env env
+        in ML_code inp_env ((comm, st, SNOC (Dmod (strlit mn) m_decls) decls,
             env2) :: bls) st2`
   (rw [ML_code_def, ML_code_env_def]
   \\ fs [SNOC_APPEND,Decls_APPEND]

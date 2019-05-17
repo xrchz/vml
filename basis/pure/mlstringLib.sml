@@ -48,8 +48,8 @@ fun mlstring_case_conv tm =
                            name="char_EQ_CONV",
                            pats=[``x:char = y``]})
     val the_rws = [
-      mlstringTheory.mlstring_11,
-      mlstringTheory.mlstring_case_def]
+      libTheory.mlstring_11,
+      libTheory.mlstring_case_def]
     val th = prove(g, (* (set_goal([],g)) *)
       rpt gen_tac >>
       CONV_TAC(RAND_CONV(PairedLambda.let_CONV)) >>
