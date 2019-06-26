@@ -18,16 +18,16 @@ val _ = Datatype `
 val infer_t_size_def = fetch "-" "infer_t_size_def";
 
 val id_to_string_def = Define `
-  (id_to_string (Short s) = implode s) ∧
+  (id_to_string (Short s) = s) ∧
   (id_to_string (Long x id) =
-    concat [implode x; implode "."; id_to_string id])`;
+    concat [x; implode "."; id_to_string id])`;
 
 val get_tyname_def = Define `
   get_tyname n (Bind [] []) = NONE /\
   get_tyname n (Bind [] ((m,ys)::xs)) =
     (case get_tyname n ys of
      | NONE => get_tyname n (Bind [] xs)
-     | SOME x => SOME (m ++ "." ++ x)) /\
+     | SOME x => SOME (concat [m; implode "."; x])) /\
   get_tyname n (Bind ((tyname,_,t)::xs) m) =
     if (case t of Tapp _ m => m = n | _ => F) then
       SOME tyname
@@ -62,7 +62,7 @@ val type_ident_to_string_def = Define `
   else
     case get_tyname ti tys of
     | NONE => mlint$toString (&ti)
-    | SOME s => implode s`;
+    | SOME s => s`;
 
 (* TODO: update for pretty printing *)
 

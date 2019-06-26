@@ -240,7 +240,7 @@ Proof
       metis_tac [MEM_EL]) >>
     simp [] >>
     disch_then kall_tac >>
-    `MAP (\(x,y). (x:string, unconvert_t y)) = MAP (\p. (FST p, unconvert_t (SND p)))`
+    `MAP (\(x,y). (x:mlstring, unconvert_t y)) = MAP (\p. (FST p, unconvert_t (SND p)))`
       by (AP_TERM_TAC >> rw [LAMBDA_PROD]) >>
     simp [GSYM ZIP_MAP, LENGTH_GENLIST, MAP_GENLIST, combinTheory.o_DEF, unconvert_t_def] >>
     EXISTS_TAC ``GENLIST (\n. case find_index (EL n (fvs:tvarN list)) (nub fvs') 0
@@ -278,7 +278,7 @@ Proof
       metis_tac [MEM_EL]) >>
     simp [] >>
     disch_then kall_tac >>
-    `MAP (\(x,y). (x:string, unconvert_t y)) = MAP (\p. (FST p, unconvert_t (SND p)))`
+    `MAP (\(x,y). (x:mlstring, unconvert_t y)) = MAP (\p. (FST p, unconvert_t (SND p)))`
       by (AP_TERM_TAC >> rw [LAMBDA_PROD]) >>
     simp [GSYM ZIP_MAP, LENGTH_GENLIST, MAP_GENLIST, combinTheory.o_DEF, unconvert_t_def] >>
     EXISTS_TAC ``GENLIST (\n. case find_index (EL n (nub fvs':tvarN list)) fvs 0
@@ -985,6 +985,7 @@ Proof
       imp_res_tac infer_e_next_id_const>>
       imp_res_tac infer_p_next_id_const>>
       fs[init_infer_state_def]))
+
   >- ( (* Letrec *)
     qmatch_goalsub_rename_tac`Dletrec locs funs` >>
     rw[infer_d_def,success_eqns,init_state_def]>>
@@ -1028,6 +1029,7 @@ Proof
         disch_then(qspec_then`x` assume_tac)>>rfs[LENGTH_COUNT_LIST,EL_MAP,EL_ZIP,EL_COUNT_LIST])
       >>
         metis_tac[])>>
+
     simp[GSYM CONJ_ASSOC]
     \\ conj_tac
     >- (
@@ -1043,7 +1045,9 @@ Proof
       (fs[namespaceTheory.alist_to_ns_def]>>
       Cases_on`x`>>fs[namespaceTheory.nsLookupMod_def])
     \\ imp_res_tac infer_e_next_id_const \\ fs[init_infer_state_def]
-    \\ conj_tac >-
+    \\ conj_tac
+
+ >-
       (* Soundness direction:
          Because the type system chooses a MGU (assumption 4),
          we show that the inferred (and generalised) type is sound, and so the type system
@@ -1144,6 +1148,7 @@ Proof
         \\ match_mp_tac nsAll_alist_to_ns
         \\ fs[EVERY_MAP, UNCURRY, every_zip_snd, LENGTH_COUNT_LIST]
         \\ fs[inf_set_tids_subset_def, inf_set_tids_def])
+
       \\ strip_tac
       \\ pop_assum (qspec_then`n` assume_tac)>>
       rfs[MAP2_MAP,EL_MAP,LENGTH_COUNT_LIST,EL_COUNT_LIST]>>
@@ -1151,8 +1156,7 @@ Proof
       pairarg_tac>>fs[]>>
       `t_walkstar last_sub (Infer_Tuvar n) = t_walkstar last_sub t'` by
         (fs[Once LIST_EQ_REWRITE]>>
-        first_x_assum(qspec_then`n` kall_tac)>>
-        first_x_assum(qspec_then`n` assume_tac)>>
+        rpt (first_x_assum(qspec_then`n` assume_tac))>>
         rfs[EL_MAP,EL_COUNT_LIST,EL_ZIP]>>fs[])>>
       imp_res_tac ALOOKUP_ALL_DISTINCT_EL >>res_tac>>fs[]>>
       Cases_on`EL n bindings`>>fs[]>>

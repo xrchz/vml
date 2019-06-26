@@ -257,9 +257,9 @@ val check_ctor_types_def = Define `
   (check_ctor_types l tenvT tvs ((cn,ts)::ctors) =
     do
       type_name_check_subst_list l
-            (\tv. concat [implode "Unbound type variable "; implode tv;
+            (\tv. concat [implode "Unbound type variable "; tv;
                           implode " in type definition with constructor ";
-                          implode cn])
+                          cn])
             tenvT tvs ts;
       check_ctor_types l tenvT tvs ctors
     od)`;
@@ -269,14 +269,14 @@ val check_ctors_def = Define `
   (check_ctors l tenvT ((tvs,tn,ctors)::tds) =
     do
       check_dups l
-                 (\n. concat [implode "Duplicate constructor "; implode n;
+                 (\n. concat [implode "Duplicate constructor "; n;
                               implode " in the definition of type ";
-                              implode tn])
+                              tn])
                  (MAP FST ctors);
       check_dups l
-                 (\n. concat [implode "Duplicate type variable binding "; implode n;
+                 (\n. concat [implode "Duplicate type variable binding "; n;
                               implode " in the definition of type ";
-                              implode tn])
+                              tn])
                  tvs;
       check_ctor_types l tenvT tvs ctors;
       check_ctors l tenvT tds;
@@ -286,7 +286,7 @@ val check_type_definition_def = Define `
   check_type_definition l tenvT tds =
     do
       check_dups l
-                 (\n. concat [implode "Duplicate type constructor "; implode n;
+                 (\n. concat [implode "Duplicate type constructor "; n;
                               implode " in a mutually recursive type definition"])
                  (MAP (FST o SND) tds);
       check_ctors l tenvT tds;
@@ -335,7 +335,7 @@ val infer_p_def = tDefine "infer_p" `
 (infer_p l ienv (Ptannot p t) =
  do (t',tenv) <- infer_p l ienv p;
     t'' <- type_name_check_subst l
-            (\tv. concat [implode "Type variable "; implode tv; implode " found in type annotation. ";
+            (\tv. concat [implode "Type variable "; tv; implode " found in type annotation. ";
                           implode "Type variables are not supported in type annotations."])
             ienv.inf_t [] t;
     () <- add_constraint l t' (infer_type_subst [] t'');
@@ -760,7 +760,7 @@ val infer_e_def = tDefine "infer_e" `
   *)
 (infer_e l ienv (Letrec funs e) =
   do
-    check_dups l (\n. concat [implode "Duplicate function name "; implode n;
+    check_dups l (\n. concat [implode "Duplicate function name "; n;
                               implode " in mutually recursive function definition"])
                  (MAP FST funs);
      uvars <- n_fresh_uvar (LENGTH funs);
@@ -773,7 +773,7 @@ val infer_e_def = tDefine "infer_e" `
 (infer_e l ienv (Tannot e t) =
   do t' <- infer_e l ienv e ;
      t'' <- type_name_check_subst l
-            (\tv. concat [implode "Type variable "; implode tv; implode " found in type annotation. ";
+            (\tv. concat [implode "Type variable "; tv; implode " found in type annotation. ";
                           implode "Type variables are not supported in type annotations."])
             ienv.inf_t [] t;
      () <- add_constraint l t' (infer_type_subst [] t'');
@@ -792,7 +792,7 @@ val infer_e_def = tDefine "infer_e" `
    return ()) ∧
 (infer_pes l ienv ((p,e)::pes) t1 t2 =
   do (t1', env') <- infer_p l ienv p;
-    check_dups l (\n. concat [implode "Duplicate variable "; implode n;
+    check_dups l (\n. concat [implode "Duplicate variable "; n;
                               implode " in pattern"])
               (MAP FST env');
      () <- add_constraint l t1 t1' ;
@@ -835,7 +835,7 @@ val infer_d_def = Define `
      t1 <- infer_e <| loc := SOME locs; err := ienv.inf_t |> ienv e;
      (t2,env') <- infer_p <| loc := SOME locs; err := ienv.inf_t |> ienv p;
      check_dups <| loc := SOME locs; err := ienv.inf_t |>
-                   (\n. concat [implode "Duplicate variable "; implode n;
+                   (\n. concat [implode "Duplicate variable "; n;
                                 implode " in the left-hand side of a definition"])
                 (MAP FST env');
      () <- add_constraint <| loc := SOME locs; err := ienv.inf_t |> t1 t2;
@@ -850,7 +850,7 @@ val infer_d_def = Define `
 (infer_d ienv (Dletrec locs funs) =
   do
     check_dups <| loc := SOME locs; err := ienv.inf_t |>
-       (\n. concat [implode "Duplicate function name "; implode n;
+       (\n. concat [implode "Duplicate function name "; n;
             implode " a mutually recursive function definition"])
                (MAP FST funs);
      () <- init_state;
@@ -880,12 +880,12 @@ val infer_d_def = Define `
   do
     check_dups <| loc := SOME locs; err := ienv.inf_t |>
        (\n. concat [implode "Duplicate type variable bindings for ";
-                    implode n; implode " in type abbreviation ";
-                    implode tn])
+                    n; implode " in type abbreviation ";
+                    tn])
               tvs;
      t' <- type_name_check_subst <| loc := SOME locs; err := ienv.inf_t |>
-            (\tv. concat [implode "Unbound type variable "; implode tv; implode " in type abbreviation ";
-                          implode tn])
+            (\tv. concat [implode "Unbound type variable "; tv; implode " in type abbreviation ";
+                          tn])
             ienv.inf_t tvs t;
      return <| inf_v := nsEmpty;
                inf_c := nsEmpty;
@@ -894,7 +894,8 @@ val infer_d_def = Define `
 (infer_d ienv (Dexn locs cn ts) =
   do
     ts' <- type_name_check_subst_list <| loc := SOME locs; err := ienv.inf_t |>
-            (\tv. concat [implode "Type variable "; implode tv; implode " found in declaration of exception "; implode cn;
+            (\tv. concat [implode "Type variable "; tv;
+                          implode " found in declaration of exception "; cn;
                           implode ". Type variables are not allowed in exception declarations."])
             ienv.inf_t [] ts;
     return <| inf_v := nsEmpty;
@@ -1169,14 +1170,14 @@ val ns_nub_def = tDefine "ns_nub" `
 val ns_to_alist = Define `
   (ns_to_alist (Bind [] []) = []) /\
   (ns_to_alist (Bind [] ((n,x)::ms)) =
-    MAP (\(x,y). (n++"."++x,y)) (ns_to_alist x) ++
+    MAP (\(x,y). (concat [n;strlit ".";x],y)) (ns_to_alist x) ++
     ns_to_alist (Bind [] ms)) /\
   (ns_to_alist (Bind ((s,x)::xs) m) = (s,x) :: ns_to_alist (Bind xs m))`
 
 val inf_env_to_types_string_def = Define `
   inf_env_to_types_string s =
     let l = ns_to_alist (ns_nub s.inf_v) in
-    let xs = MAP (\(n,_,t). concat [implode n; strlit ": ";
+    let xs = MAP (\(n,_,t). concat [n; strlit ": ";
                                     FST (inf_type_to_string s.inf_t t);
                                     strlit "\n";]) l in
       (* QSORT mlstring_le *) REVERSE xs`

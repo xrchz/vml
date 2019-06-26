@@ -1039,18 +1039,17 @@ val infer_type_subst_check_t_less = Q.prove(
   Induct>>rw[]
   >-
     (fs[check_freevars_def,infer_type_subst_def]>>
-    `?x. ALOOKUP (ZIP(tvs,ls)) s = SOME x` by
+    `?x. ALOOKUP (ZIP(tvs,ls)) m = SOME x` by
       (SPOSE_NOT_THEN assume_tac>>
       imp_res_tac NOT_SOME_NONE>>
       fs[ALOOKUP_NONE]>>
       metis_tac[MAP_ZIP])>>
     imp_res_tac ALOOKUP_MEM>>
-    Q.ISPECL_THEN [`tvs`,`ls`,`s,x`] assume_tac MEM_ZIP>> rfs[]>>
+    Q.ISPECL_THEN [`tvs`,`ls`,`m,x`] assume_tac MEM_ZIP>> rfs[]>>
     metis_tac[EVERY_EL])
   >>
     fs[infer_type_subst_def,check_t_def,check_freevars_def]>>
     fs[EVERY_MAP]>>metis_tac[]);
-
 
 Theorem infer_p_complete:
    (!tvs tenv p t tenvE.
