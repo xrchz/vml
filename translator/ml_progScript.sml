@@ -59,6 +59,27 @@ Proof
   \\ fs[nsLookup_Mod1_def, nsLookup_def]
 QED
 
+(* comparison for mlstrings (domain of the partial functions) *)
+
+val cmp_by_def = Define `
+  cmp_by f cmp x y = cmp (f x) (f y)`;
+
+Theorem cmp_by_good:
+  good_cmp cmp ==> good_cmp (cmp_by f cmp)
+Proof
+  simp_tac bool_ss [comparisonTheory.good_cmp_thm, cmp_by_def]
+  \\ metis_tac []
+QED
+
+val mlstring_cmp_def = Define `
+  mlstring_cmp = cmp_by explode string_cmp`;
+
+Theorem mlstring_cmp_good:
+  good_cmp mlstring_cmp
+Proof
+  simp [mlstring_cmp_def, cmp_by_good, comparisonTheory.string_cmp_good]
+QED
+
 (* base facts about the partial functions *)
 
 Theorem option_choice_f_apply:

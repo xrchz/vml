@@ -24,15 +24,16 @@ val nsLookup_pf_tms = [prim_mk_const {Name = "nsLookup_Mod1", Thy = "ml_prog"},
     prim_mk_const {Name = "nsLookup_Short", Thy = "ml_prog"}]
 
 fun str_dest tm = stringSyntax.fromHOLstring tm |> explode |> map ord
+val mlstr_dest = str_dest o mlstringSyntax.dest_strlit
 
 val env_type = type_of (prim_mk_const {Name = "empty_env", Thy = "ml_prog"})
 
 local
 
 val nsLookup_repr_set = let
-    val irrefl_thm = MATCH_MP good_cmp_Less_irrefl_trans string_cmp_good
+    val irrefl_thm = MATCH_MP good_cmp_Less_irrefl_trans mlstring_cmp_good
   in alist_treeLib.mk_alist_reprs irrefl_thm EVAL
-    str_dest (list_compare Int.compare)
+    mlstr_dest (list_compare Int.compare)
   end
 
 val empty = (Redblackmap.mkDict Term.compare : (term, unit) Redblackmap.dict)
