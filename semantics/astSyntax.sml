@@ -8,7 +8,6 @@ structure astSyntax = struct
   open semanticPrimitivesSyntax astTheory;
   in
   fun id_ty tyM tyV = mk_thy_type{Thy="namespace",Tyop="id",Args=[tyM,tyV]};
-  val str_id_ty = id_ty stringSyntax.string_ty stringSyntax.string_ty;
   (* types *)
   val lit_ty = mk_thy_type{Thy="ast",Tyop="lit",Args=[]};
   val opn_ty = mk_thy_type{Thy="ast",Tyop="opn",Args=[]};
@@ -139,6 +138,11 @@ structure astSyntax = struct
   local val s = HolKernel.syntax_fns4 "ast" in
   (* four-argument functions *)
   val (Dtabbrev_tm,mk_Dtabbrev,dest_Dtabbrev,is_Dtabbrev) = s "Dtabbrev";
+  end
+  local
+  val mlstring_ty = Dmod_tm |> type_of |> dest_type |> snd |> hd
+  in
+  val str_id_ty = id_ty mlstring_ty mlstring_ty;
   end
   end
 end

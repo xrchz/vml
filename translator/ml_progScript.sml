@@ -547,7 +547,7 @@ val ML_code_env_def = Define `(ML_code_env env [] = env)
 
 val ML_code_def = Define `(ML_code env [] res_st <=> T)
     /\ (ML_code env
-        (((comment : string # string), st, decls, res_env) :: bls)
+        (((comment : mlstring # mlstring), st, decls, res_env) :: bls)
         res_st <=> (ML_code env bls st
             /\ Decls (ML_code_env env bls) st decls res_env res_st))`;
 
@@ -597,7 +597,7 @@ val nsLookup_init_env_pfun_eqs = save_thm("nsLookup_init_env_pfun_eqs",
 end
 
 Theorem ML_code_NIL:
-   ML_code init_env [(("Toplevel", ""), init_state ffi, [], empty_env)]
+   ML_code init_env [((strlit "Toplevel", strlit ""), init_state ffi, [], empty_env)]
     (init_state ffi)
 Proof
   fs [ML_code_def,Decls_NIL]
@@ -615,10 +615,10 @@ Proof
 QED
 
 Theorem ML_code_close_module:
-   ML_code inp_env ((("Module", mn), m_i_st, m_decls, m_env)
+   ML_code inp_env (((strlit "Module", mn), m_i_st, m_decls, m_env)
         :: (comm, st, decls, env) :: bls) st2
-    ==> let env2 = write_mod (strlit mn) m_env env
-        in ML_code inp_env ((comm, st, SNOC (Dmod (strlit mn) m_decls) decls,
+    ==> let env2 = write_mod mn m_env env
+        in ML_code inp_env ((comm, st, SNOC (Dmod mn m_decls) decls,
             env2) :: bls) st2
 Proof
   rw [ML_code_def, ML_code_env_def]
@@ -629,8 +629,8 @@ Proof
 QED
 
 Theorem ML_code_close_local:
-   ML_code inp_env ((("Local", ln2), l2_i_st, l2_decls, l2_env)
-        :: (("Local", ln1), l1_i_st, l1_decls, l1_env)
+   ML_code inp_env (((strlit "Local", ln2), l2_i_st, l2_decls, l2_env)
+        :: ((strlit "Local", ln1), l1_i_st, l1_decls, l1_env)
         :: (comm, st, decls, env) :: bls) st2
     ==> let env2 = merge_env l2_env env
         in ML_code inp_env ((comm, st, SNOC (Dlocal l1_decls l2_decls) decls,

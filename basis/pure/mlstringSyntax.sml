@@ -33,4 +33,7 @@ fun is_mlstring_literal tm =
   stringSyntax.is_string_literal(dest_strlit tm)
   handle HOL_ERR _ => false
 
+fun fromMLstring s =
+  mk_strlit (stringSyntax.fromMLstring s)
+
 end
