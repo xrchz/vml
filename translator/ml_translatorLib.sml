@@ -402,7 +402,7 @@ end
  * current module) we give a Long name, otherwise the name is short.
  *)
 fun full_id n =
-  case lookup_type_mod (stringSyntax.fromHOLstring n) of
+  case lookup_type_mod (stringSyntax.fromHOLstring (mlstringSyntax.dest_strlit n)) of
     NONE => astSyntax.mk_Short n
   | SOME type_mod => get_qualified_name type_mod n;
 
@@ -1113,9 +1113,10 @@ fun guess_const_def tm = let
     val stuff = dest_thy_const tm
   in DB.fetch (#Thy stuff) (#Name stuff ^ "_def") end
 
-fun str_dest tm = stringSyntax.fromHOLstring tm |> explode |> map ord
+fun str_dest tm =
+  mlstringSyntax.dest_strlit tm |> stringSyntax.fromHOLstring |> explode |> map ord
 val str_all_distinct_conv = let open permLib comparisonTheory
-  in ALL_DISTINCT_CONV (MATCH_MP good_cmp_Less_irrefl_trans string_cmp_good)
+  in ALL_DISTINCT_CONV (MATCH_MP good_cmp_Less_irrefl_trans mlstring_cmp_good)
     (fn x => fn y => list_compare Int.compare (str_dest x, str_dest y) = LESS)
     EVAL
   end
@@ -1521,7 +1522,7 @@ val th = inv_defs |> map #2 |> hd
     val dtype_list = listSyntax.mk_list(dtype_parts,type_of (hd dtype_parts))
     in (astSyntax.mk_Dtype (unknown_loc,dtype_list),dtype_list) end
   fun is_prim_Dexn tm =
-    is_primitive_exception (tm |> rator |> rand |> stringSyntax.fromHOLstring)
+    is_primitive_exception (tm |> rator |> rand |> rand |> stringSyntax.fromHOLstring)
   val dexn_list = if not is_exn_type then []
                   else dtype |> rand |> rator |> rand |> rand |> rand
                              |> listSyntax.dest_list |> fst
@@ -4367,7 +4368,7 @@ fun add_dec_for_v_thm ((fname,ml_fname,tm,cert,pre,mn),state) =
           if already_defined then state else
           let
             val v_names =
-              map (fn x => find_const_name (stringSyntax.fromHOLstring x ^ "_v"))
+              map (fn x => find_const_name (stringSyntax.fromHOLstring (rand x) ^ "_v"))
                   recc_names
           in add_Dletrec unknown_loc recc v_names state end
         val lemmas = LOOKUP_VAR_def :: map GSYM (get_v_defs state')
