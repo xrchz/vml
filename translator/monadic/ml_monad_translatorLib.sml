@@ -368,7 +368,7 @@ fun abbrev_nsLookup_code th = let
                          can (match_term pat2) tm
   val lookup_assums = List.filter can_match_pat (hyp th)
   val get_fun_name =
-    stringSyntax.fromHOLstring o rand o rand o rand o rator
+    stringSyntax.fromHOLstring o rand o rand o rand o rand o rator
   fun get_code tm =
     if can (match_term pat1) tm then (rand o rand o rand) tm
     else (rand o rator o rand o rand) tm
@@ -394,8 +394,8 @@ fun lookup_dynamic_v_thm tm = let
         (fn (_, _, _, x, _, _) => (concl x |> rator |> rand |> same_const tm))
         matches
     val th = MATCH_MP Eval_Var_Short th
-    val v_name = stringSyntax.fromMLstring ml_name
-    val th = SPECL [stringSyntax.fromMLstring ml_name, v_env] th |> UNDISCH_ALL
+    val v_name = mlstringSyntax.fromMLstring ml_name
+    val th = SPECL [mlstringSyntax.fromMLstring ml_name, v_env] th |> UNDISCH_ALL
 in th end;
 
 
@@ -449,7 +449,7 @@ local
       val exn_param_types = (fst o ml_monadBaseLib.dest_fun_type o type_of) cons
       val refin_invs = List.map smart_get_type_inv exn_param_types
 
-      val cons_name = fst (dest_const cons) |> stringSyntax.fromMLstring
+      val cons_name = fst (dest_const cons) |> mlstringSyntax.fromMLstring
 
       val raise_fun = raise_fun_def |> concl |> strip_forall |> snd |> lhs
       val E = raise_fun_def |> concl |> strip_forall |> snd |> rhs |> dest_abs
@@ -528,7 +528,7 @@ local
       val handle_fun = concl handle_fun_def |> strip_forall |> snd |> lhs
       val exn_type = type_of EXN_RI_tm |> dest_type |> snd |> List.hd
 
-      val cons_name = fst (dest_const cons) |> stringSyntax.fromMLstring
+      val cons_name = fst (dest_const cons) |> mlstringSyntax.fromMLstring
 
       (* Instantiate the EvalM specification *)
       val CORRECT_CONS = let
@@ -1149,7 +1149,7 @@ fun var_hol2deep tm =
     val (name,ty) = dest_var tm
     val inv = get_arrow_type_inv ty
     val inv = ONCE_REWRITE_CONV [ArrowM_def] inv |> concl |> rand |> rand
-    val str = stringSyntax.fromMLstring name
+    val str = mlstringSyntax.fromMLstring name
     val result = ISPECL_TM [str,mk_comb(inv,tm)] Eval_name_RI_abs |> ASSUME
     in check_inv "var" tm result end
   else hol2deep tm;
@@ -1420,7 +1420,7 @@ in
         val aa = snd (first (fn (pat,_) => can (match_term tm) pat) ns)
         in zip aa xs end) ts |> flatten
     val ms = List.map
-      (fn (b,(x,n,v)) => n |-> stringSyntax.fromMLstring (fst (dest_var b))) ns
+      (fn (b,(x,n,v)) => n |-> mlstringSyntax.fromMLstring (fst (dest_var b))) ns
     val th = INST ms th
     val ks = List.map
               (fn (b,(x,n,v)) => (fst (dest_var x), fst (dest_var b))) ns @
@@ -1471,7 +1471,7 @@ in result end
 fun inst_EvalM_env v th =
     let val thx = th
       val name = fst (dest_var v)
-      val str = stringLib.fromMLstring name
+      val str = mlmlstringSyntax.fromMLstring name
       val inv = smart_get_type_inv (type_of v)
       val tys = Type.match_type (type_of v)
         (type_of inv |> dest_type |> snd |> List.hd)
@@ -1528,8 +1528,8 @@ in th3 end;
 
 fun apply_EvalM_Recclosure recc fname v th = let
   val vname = fst (dest_var v)
-  val vname_str = stringLib.fromMLstring vname
-  val fname_str = stringLib.fromMLstring fname
+  val vname_str = mlmlstringSyntax.fromMLstring vname
+  val fname_str = mlmlstringSyntax.fromMLstring fname
   val FORALL_CONV = RAND_CONV o ABS_CONV
   val is_monad_only = not
     (can (match_term (SPEC_ALL ArrowM_def |> concl |> dest_eq |> fst))
@@ -1618,7 +1618,7 @@ fun inst_list_EvalM_env xl th = let
 
     fun make_new_env ((x,v),env) = let
         val name = fst (dest_var x)
-        val str = stringLib.fromMLstring name
+        val str = mlmlstringSyntax.fromMLstring name
         val new_env = mk_write str v env
     in new_env end
     val old_env =
@@ -1890,7 +1890,7 @@ and inst_EvalM_handle EvalM_th tm = let
     val thy2 = inst_list_EvalM_env vars thy
     val inv = get_type_inv (#2 (dest_monad_type (type_of x)))
 
-    val var_to_HOL_name = stringLib.fromMLstring o fst o dest_var
+    val var_to_HOL_name = mlmlstringSyntax.fromMLstring o fst o dest_var
     val HOL_names = List.map var_to_HOL_name vars
     val bind_names = listSyntax.mk_list (HOL_names, string_ty)
     val lemma1 = ISPECL [bind_names, inv, !(#H translator_state)] EvalM_th |>
@@ -2031,7 +2031,7 @@ and m2deep tm =
     val (name,ty) = dest_var tm
     val inv = get_arrow_type_inv ty
               |> ONCE_REWRITE_CONV [ArrowM_def] |> concl |> rand |> rand
-    val str = stringSyntax.fromMLstring name
+    val str = mlstringSyntax.fromMLstring name
     val result = ISPECL_TM [str,mk_ucomb(inv,tm)] Eval_name_RI_abs |> ASSUME
                  |> MY_MATCH_MP (SPEC_ALL (ISPEC_EvalM Eval_IMP_PURE)) |>
                  REWRITE_RULE [GSYM ArrowM_def]
@@ -2200,7 +2200,7 @@ and m2deep tm =
     fun dest_args tm = rand tm :: dest_args (rator tm) handle HOL_ERR _ => []
     val xs = dest_args tm
     val f = repeat rator lhs
-    val str = stringLib.fromMLstring fname
+    val str = mlmlstringSyntax.fromMLstring fname
     fun mk_fix tm =
       let
         val inv_type = type_of tm
@@ -2983,7 +2983,7 @@ fun m_translate_main def =
               |> PURE_REWRITE_RULE[ArrowM_def, code_def]
               |> MATCH_MP EvalM_Fun_Var_intro
               |> PURE_REWRITE_RULE[GSYM ArrowM_def]
-              |> SPEC (stringSyntax.fromMLstring ml_fname)
+              |> SPEC (mlstringSyntax.fromMLstring ml_fname)
               |> UNDISCH
               |> remove_local_code_abbrevs
             else let
@@ -3001,8 +3001,8 @@ fun m_translate_main def =
           (* introduce Recclosure *)
           fun mk_Recclosure_part (fname,ml_fname,def,th,v) =
             let
-              val fname = ml_fname |> stringLib.fromMLstring
-              val name = v |> dest_var |> fst |> stringLib.fromMLstring
+              val fname = ml_fname |> mlmlstringSyntax.fromMLstring
+              val name = v |> dest_var |> fst |> mlmlstringSyntax.fromMLstring
               val body = th |> UNDISCH_ALL |> concl |> rator |> rator |> rand
             in pairSyntax.list_mk_pair[fname,name,body] end
           val parts = List.map mk_Recclosure_part thms
@@ -3220,7 +3220,7 @@ fun m_translate def =
     in
       if is_fun then let
         val th = th |> INST [cl_env_tm |-> get_curr_env()]
-        val n = ml_fname |> stringSyntax.fromMLstring
+        val n = ml_fname |> mlstringSyntax.fromMLstring
         val lookup_var_assum = th |> hyp |>
           first (can (match_term(LOOKUP_VAR_def |> SPEC n |>
             SPEC_ALL |> concl |> lhs)))
@@ -3478,7 +3478,7 @@ fun create_local_references init_state th = let
             get_field_access_eval_thm (mk_comb (accessor, init_state))
 
         val get_ref_exp = concl Eval_state_field |> get_Eval_exp
-        val st_name = stringLib.fromMLstring (dest_var state_var |> fst)
+        val st_name = mlmlstringSyntax.fromMLstring (dest_var state_var |> fst)
         val env = concl th |> rator |> rator |> rator |> rator |> rand
 
         val nenv = mk_write loc_name loc env
@@ -3595,7 +3595,7 @@ fun m_translate_run def =
 
     val fname = repeat rator def_lhs |> dest_const |> fst |> get_unique_name
     val _ = print ("Translating monadic run: " ^ fname ^ "\n")
-    val fname_str = stringLib.fromMLstring fname
+    val fname_str = mlmlstringSyntax.fromMLstring fname
 
     val state = rand def_rhs
     val monad_tm = rand (rator def_rhs)
@@ -3632,7 +3632,7 @@ fun m_translate_run def =
       let
         val (name,ty) = dest_var tm
         val inv = get_type_inv ty
-        val str = stringSyntax.fromMLstring name
+        val str = mlstringSyntax.fromMLstring name
         val result = ISPECL_TM [str,mk_comb(inv,tm)] Eval_name_RI_abs |> ASSUME
         val result = HO_MATCH_MP (ISPEC_EvalM Eval_IMP_PURE) result
         val st = concl result |> get_EvalM_state
@@ -3898,7 +3898,7 @@ local
   fun save_translator_state () =
     let
       val name = Theory.current_theory () ^ suffix
-      val name_tm = stringSyntax.fromMLstring name
+      val name_tm = mlstringSyntax.fromMLstring name
       val tag_lemma = ISPEC (mk_var("b",bool)) (ISPEC name_tm TAG_def) |> GSYM
       val packed = pack_translator_state()
       val th = PURE_ONCE_REWRITE_RULE [tag_lemma] packed
