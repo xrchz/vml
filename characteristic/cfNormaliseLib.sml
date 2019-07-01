@@ -34,6 +34,8 @@ val ERR = mk_HOL_ERR "cfNormaliseLib";
 
 (* We first strip line & type annotations *)
 
+fun fromHOLmlstring tm = stringLib.fromHOLstring (rand tm);
+
 fun dest_triple tm = let
   val (x, yz) = pairLib.dest_pair tm
   val (y, z) = pairLib.dest_pair yz
@@ -206,11 +208,11 @@ fun is_App_Opapp e =
 fun norm_exp gen e = let
   val (fresh, record_name) = gen
   fun record_var v =
-    record_name (stringLib.fromHOLstring v)
+    record_name (fromHOLmlstring v)
 
   fun wrap_if_needed needs_wrapping e b =
     if needs_wrapping then (
-      let val x = fresh () |> stringSyntax.fromMLstring in
+      let val x = fresh () |> stringSyntax.fromMLstring |> mlstringSyntax.mk_strlit in
       (mk_Var (mk_Short x), b @ [(x, e)])
       end
     ) else (e, b)
@@ -406,7 +408,7 @@ fun normalise_decl d =
     val (locs, l_tm) = dest_Dletrec d
     val (l, l_ty) = listSyntax.dest_list l_tm
     val gen = mk_names_generator ()
-    fun record_var v = snd gen (stringLib.fromHOLstring v)
+    fun record_var v = snd gen (fromHOLmlstring v)
     val l' = List.map (fn fdecl => let
       val (f, x, body) = dest_triple fdecl
       val _ = (record_var f; record_var x)

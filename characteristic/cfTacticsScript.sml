@@ -102,13 +102,13 @@ Proof
 QED
 
 Theorem BOOL_T_Conv[simp]:
-   BOOL T (Conv (SOME (TypeStamp "True" bool_type_num)) []) = T
+   BOOL T (Conv (SOME (TypeStamp (strlit "True") bool_type_num)) []) = T
 Proof
   fs [BOOL_def, semanticPrimitivesTheory.Boolv_def]
 QED
 
 Theorem BOOL_F_Conv[simp]:
-   BOOL F (Conv (SOME (TypeStamp "False" bool_type_num)) []) = T
+   BOOL F (Conv (SOME (TypeStamp (strlit "False") bool_type_num)) []) = T
 Proof
   fs [BOOL_def, semanticPrimitivesTheory.Boolv_def]
 QED
@@ -150,9 +150,9 @@ Proof
 QED
 
 val BOOL_T = save_thm("BOOL_T",
-  EVAL ``BOOL T (Conv (SOME (TypeStamp "True" 0)) [])``);
+  EVAL ``BOOL T (Conv (SOME (TypeStamp (strlit "True") 0)) [])``);
 
 val BOOL_F = save_thm("BOOL_F",
-  EVAL ``BOOL F (Conv (SOME (TypeStamp "False" 0)) [])``);
+  EVAL ``BOOL F (Conv (SOME (TypeStamp (strlit "False") 0)) [])``);
 
 val _ = export_theory()

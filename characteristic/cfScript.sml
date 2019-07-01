@@ -1825,7 +1825,7 @@ val cf_def = tDefine "cf" `
              | _ => cf_bottom)
         | FFI ffi_index =>
           (case args of
-             | [c;w] => cf_ffi ffi_index c w
+             | [c;w] => cf_ffi (explode ffi_index) c w
              | _ => cf_bottom)
         | _ => cf_bottom) /\
   cf (p:'ffi ffi_proj) (Log lop e1 e2) =
@@ -2194,7 +2194,9 @@ val cf_ffi_sound = Q.prove (
   `sound (p:'ffi ffi_proj) (App (FFI ffi_index) [c; r]) (\env. local (\H Q.
      ?cv rv. exp2v env r = SOME rv /\
           exp2v env c = SOME cv /\
-          app_ffi ffi_index cv rv H Q))`,
+          app_ffi (explode ffi_index) cv rv H Q))`,
+   Cases_on `ffi_index` \\ fs [mlstringTheory.explode_def] \\
+   rename [`strlit ffi_index`] \\
    cf_strip_sound_tac \\
    fs[app_ffi_def] \\
    Cases_on `u ffi_index conf ws s`
