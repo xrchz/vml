@@ -11,16 +11,16 @@ val _ = translation_extends"Word8ArrayProg"
 val () = ml_prog_update (open_module "Array");
 
 val _ = ml_prog_update (add_dec
-  ``Dtabbrev unknown_loc ["'a"] "array" (Atapp [Atvar "'a"] (Short "array"))`` I);
+  ``Dtabbrev unknown_loc [strlit "'a"] (strlit "array") (Atapp [Atvar (strlit "'a")] (Short (strlit "array")))`` I);
 
 val () = append_decs
-   ``[mk_binop "array" Aalloc;
-      mk_unop "arrayEmpty" AallocEmpty;
-      mk_binop "sub" Asub;
-      mk_unop "length" Alength;
-      Dlet unknown_loc (Pvar "update")
-       (Fun "x" (Fun "y" (Fun "z"
-         (App Aupdate [Var (Short "x"); Var (Short "y"); Var (Short "z")])))) ]``;
+   ``[mk_binop (strlit "array") Aalloc;
+      mk_unop (strlit "arrayEmpty") AallocEmpty;
+      mk_binop (strlit "sub") Asub;
+      mk_unop (strlit "length") Alength;
+      Dlet unknown_loc (Pvar (strlit "update"))
+       (Fun (strlit "x") (Fun (strlit "y") (Fun (strlit "z")
+         (App Aupdate [Var (Short (strlit "x")); Var (Short (strlit "y")); Var (Short (strlit "z"))])))) ]``;
 
 val array_fromList = process_topdecs
   `fun fromList l =
@@ -258,50 +258,50 @@ val _ = ml_prog_update open_local_block;
 (* Parser bug, see Issue #25 *)
 val array_findi_aux =
 ``[(Dletrec unknown_loc
-[("findi_aux","f",
- Fun "arr"
-   (Fun "max"
-      (Fun "n"
-         (Let (SOME "a")
+[(strlit "findi_aux", strlit "f",
+ Fun (strlit "arr")
+   (Fun (strlit "max")
+      (Fun (strlit "n")
+         (Let (SOME (strlit "a"))
             (App Opapp
-               [App Opapp [Var (Short "="); Var (Short "n")];
-                Var (Short "max")])
-            (If (Var (Short "a")) (Con (SOME (Short "None")) [])
-               (Let (SOME "b")
+               [App Opapp [Var (Short (strlit "=")); Var (Short (strlit "n"))];
+                Var (Short (strlit "max"))])
+            (If (Var (Short (strlit "a"))) (Con (SOME (Short (strlit "None"))) [])
+               (Let (SOME (strlit "b"))
                   (App Opapp
                      [App Opapp
-                        [Var (Short "sub"); Var (Short "arr")];
-                      Var (Short "n")])
-                  (Let (SOME "c")
+                        [Var (Short (strlit "sub")); Var (Short (strlit "arr"))];
+                      Var (Short (strlit "n"))])
+                  (Let (SOME (strlit "c"))
                      (App Opapp
                         [App Opapp
-                           [Var (Short "f"); Var (Short "n")];
-                         Var (Short "b")])
-                     (If (Var (Short "c"))
-                        (Let (SOME "d")
+                           [Var (Short (strlit "f")); Var (Short (strlit "n"))];
+                         Var (Short (strlit "b"))])
+                     (If (Var (Short (strlit "c")))
+                        (Let (SOME (strlit "d"))
                            (App Opapp
                               [App Opapp
-                                 [Var (Short "sub");
-                                  Var (Short "arr")];
-                               Var (Short "n")])
-                           (Con (SOME (Short "Some"))
-                              [Con NONE [Var (Short "n");
-                               Var (Short "d")]]))
-                        (Let (SOME "e")
+                                 [Var (Short (strlit "sub"));
+                                  Var (Short (strlit "arr"))];
+                               Var (Short (strlit "n"))])
+                           (Con (SOME (Short (strlit "Some")))
+                              [Con NONE [Var (Short (strlit "n"));
+                               Var (Short (strlit "d"))]]))
+                        (Let (SOME (strlit "e"))
                            (App Opapp
                               [App Opapp
-                                 [Var (Short "+");
-                                  Var (Short "n")];
+                                 [Var (Short (strlit "+"));
+                                  Var (Short (strlit "n"))];
                                Lit (IntLit 1)])
                            (App Opapp
                               [App Opapp
                                  [App Opapp
                                     [App Opapp
-                                       [Var (Short "findi_aux");
-                                        Var (Short "f")];
-                                     Var (Short "arr")];
-                                  Var (Short "max")];
-                               Var (Short "e")]))))))))))])]``
+                                       [Var (Short (strlit "findi_aux"));
+                                        Var (Short (strlit "f"))];
+                                     Var (Short (strlit "arr"))];
+                                  Var (Short (strlit "max"))];
+                               Var (Short (strlit "e"))]))))))))))])]``
 
 val _ = append_prog array_findi_aux;
 

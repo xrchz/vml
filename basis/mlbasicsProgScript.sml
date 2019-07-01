@@ -14,11 +14,11 @@ val _ = translation_extends"StringProg"
 
 val mk_binop_def = Define `
   mk_binop name prim = Dlet unknown_loc (Pvar name)
-    (Fun "x" (Fun "y" (App prim [Var (Short "x"); Var (Short "y")])))`;
+    (Fun (strlit "x") (Fun (strlit "y") (App prim [Var (Short (strlit "x")); Var (Short (strlit "y"))])))`;
 
 val mk_unop_def = Define `
   mk_unop name prim = Dlet unknown_loc (Pvar name)
-    (Fun "x" (App prim [Var (Short "x")]))`;
+    (Fun (strlit "x") (App prim [Var (Short (strlit "x"))]))`;
 
 (* no longer necessary
 (* list, bool, and option come from the primitive types in
@@ -56,8 +56,8 @@ val _ = trans "<>" ``\x1 x2. x1 <> (x2:'a)``;
 val _ = trans "^" mlstringSyntax.strcat_tm;
 
 val _ = append_prog
-  ``[mk_binop ":=" Opassign;
-     mk_unop "!" Opderef
+  ``[mk_binop (strlit ":=") Opassign;
+     mk_unop (strlit "!") Opderef
   (* mk_unop "ref" Opref *)]``
 
 fun prove_ref_spec op_name =
@@ -91,7 +91,7 @@ Proof
 QED
 
 val bool_toString_def = Define `
-  bool_toString b = if b then strlit "True" else strlit"False"`;
+  bool_toString b = if b then strlit "True" else strlit "False"`;
 
 val _ = ml_prog_update (open_module "Bool");
 val _ = (next_ml_names := ["toString"]);
@@ -102,11 +102,11 @@ val _ = ml_prog_update (close_module NONE);
 
 val pair_toString_def = Define `
   pair_toString f1 f2 (x,y) =
-    concat [strlit"(";
+    concat [strlit "(";
             f1 x;
-            strlit", ";
+            strlit ", ";
             f2 y;
-            strlit")"]`;
+            strlit ")"]`;
 
 val _ = ml_prog_update (open_module "Pair");
 val _ = (next_ml_names := ["map"]);

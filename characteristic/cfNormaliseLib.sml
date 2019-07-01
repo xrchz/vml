@@ -197,7 +197,7 @@ fun Lets [] body = body
 
 fun Let_NONE e1 e2 =
   mk_Let (
-    optionLib.mk_none stringSyntax.string_ty,
+    optionLib.mk_none mlstringSyntax.mlstring_ty,
     e1,
     e2
   )

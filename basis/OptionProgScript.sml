@@ -11,7 +11,8 @@ val _ = translation_extends "RuntimeProg"
 val _ = ml_prog_update (open_module "Option");
 
 val _ = ml_prog_update (add_dec
-  ``Dtabbrev unknown_loc ["'a"] "option" (Atapp [Atvar "'a"] (Short "option"))`` I);
+  ``Dtabbrev unknown_loc [strlit "'a"] (strlit "option")
+      (Atapp [Atvar (strlit "'a")] (Short (strlit "option")))`` I);
 
 val () = next_ml_names := ["getOpt"];
 val result = translate getOpt_def;

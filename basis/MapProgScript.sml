@@ -101,7 +101,7 @@ val _ = ml_prog_update (open_module "Map");
 
 (* provides the Map.map name for the map type *)
 val _ = ml_prog_update (add_dec
-  ``Dtabbrev unknown_loc ["'a";"'b"] "map" (Atapp [Atvar "'a"; Atvar "'b"] (Short "map"))`` I);
+  ``Dtabbrev unknown_loc [strlit "'a"; strlir "'b"] (strlit "map") (Atapp [Atvar (strlir "'a"); Atvar (strlit "'b")] (Short (strlit "map")))`` I);
 
 val _ = next_ml_names := ["lookup"];
 val _ = translate mlmapTheory.lookup_def;
@@ -132,7 +132,7 @@ val _ = ml_prog_update (close_module NONE);
 
 (* this is here so that the type name is accessible without the full name *)
 val _ = ml_prog_update (add_dec
-  ``Dtabbrev unknown_loc ["'a";"'b"] "map" (Atapp [Atvar "'a"; Atvar "'b"] (Short "map"))`` I);
+  ``Dtabbrev unknown_loc [strlit "'a"; strlit "'b"] (strlit "map") (Atapp [Atvar (strlit "'a"); Atvar (strlit "'b")] (Short (strlit "map")))`` I);
 
 val _ = ml_prog_update close_local_block;
 

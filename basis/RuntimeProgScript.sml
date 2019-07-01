@@ -31,11 +31,11 @@ val result = translate debugMsg_def;
 
 val exit =
  ``[Dletrec (unknown_loc)
-     ["exit","i",
-      Let (SOME "y") (App (WordFromInt W8) [Var (Short "i")])
-        (Let (SOME "x") (App Aw8alloc [Lit(IntLit 1);
-                                       Var (Short "y")])
-             (App (FFI "exit") [Lit(StrLit ""); Var (Short "x")]))]]``
+     [strlit "exit", strlit "i",
+      Let (SOME (strlit "y")) (App (WordFromInt W8) [Var (Short (strlit "i"))])
+        (Let (SOME (strlit "x")) (App Aw8alloc [Lit(IntLit 1);
+                                       Var (Short (strlit "y"))])
+             (App (FFI (strlit "exit")) [Lit(StrLit ""); Var (Short (strlit "x"))]))]]``
 
 val _ = append_prog exit
 
