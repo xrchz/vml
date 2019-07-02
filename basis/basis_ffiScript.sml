@@ -436,7 +436,7 @@ QED
   st.io_events  *)
 
 fun mk_main_call s =
-  ``(Dlet unknown_loc (Pcon NONE []) (App Opapp [Var (Short ^s); Con NONE []]))``;
+  ``(Dlet unknown_loc (Pcon NONE []) (App Opapp [Var (Short (strlit ^s)); Con NONE []]))``;
 val fname = mk_var("fname",``:string``);
 val main_call = mk_main_call fname;
 
@@ -459,7 +459,7 @@ val whole_prog_ffidiv_spec_def = Define`
 Theorem whole_prog_spec_semantics_prog:
    ∀fname fv.
      Decls env1 (init_state (basis_ffi cl fs)) prog env2 st2 ==>
-     lookup_var fname env2 = SOME fv ==>
+     lookup_var (strlit fname) env2 = SOME fv ==>
      whole_prog_spec fv cl fs sprop Q ==>
      (?h1 h2. SPLIT (st2heap (basis_proj1, basis_proj2) st2) (h1,h2) /\
      (COMMANDLINE cl * STDIO fs * case sprop of NONE => &T | SOME Q => Q) h1)
@@ -510,7 +510,7 @@ QED
 Theorem whole_prog_spec_semantics_prog_ffidiv:
    ∀fname fv.
      Decls env1 (init_state (basis_ffi cl fs)) prog env2 st2 ==>
-     lookup_var fname env2 = SOME fv ==>
+     lookup_var (strlit fname) env2 = SOME fv ==>
      whole_prog_ffidiv_spec fv cl fs Q ==>
      (?h1 h2. SPLIT (st2heap (basis_proj1, basis_proj2) st2) (h1,h2) /\
      (COMMANDLINE cl * STDIO fs * RUNTIME) h1)

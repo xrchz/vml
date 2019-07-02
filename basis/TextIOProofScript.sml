@@ -1417,8 +1417,8 @@ val print_def = Define `
 
 Theorem EvalM_print:
    Eval env exp (STRING_TYPE x) /\
-   (nsLookup env.v (Short "print") = SOME TextIO_print_v) ==>
-    EvalM F env st (App Opapp [Var (Short "print"); exp])
+   (nsLookup env.v (Short (strlit "print")) = SOME TextIO_print_v) ==>
+    EvalM F env st (App Opapp [Var (Short (strlit "print")); exp])
       (MONAD UNIT_TYPE exc_ty (print x))
       (MONAD_IO,p:'ffi ffi_proj)
 Proof
@@ -1460,9 +1460,9 @@ val print_err_def = Define `
 
 Theorem EvalM_print_err:
    Eval env exp (STRING_TYPE x) /\
-    (nsLookup env.v (Long "TextIO" (Short "print_err")) =
+    (nsLookup env.v (Long (strlit "TextIO") (Short (strlit "print_err"))) =
       SOME TextIO_print_err_v) ==>
-    EvalM F env st (App Opapp [Var (Long "TextIO" (Short "print_err")); exp])
+    EvalM F env st (App Opapp [Var (Long (strlit "TextIO") (Short (strlit "print_err"))); exp])
       (MONAD UNIT_TYPE exc_ty (print_err x))
       (MONAD_IO,p:'ffi ffi_proj)
 Proof
@@ -2365,9 +2365,10 @@ val inputLinesFrom_def = Define `
 
 Theorem EvalM_inputLinesFrom:
    Eval env exp (FILENAME f) /\
-    (nsLookup env.v (Long "TextIO" (Short "inputLinesFrom")) =
+    (nsLookup env.v (Long (strlit "TextIO") (Short (strlit "inputLinesFrom"))) =
        SOME TextIO_inputLinesFrom_v) ==>
-    EvalM F env st (App Opapp [Var (Long "TextIO" (Short "inputLinesFrom")); exp])
+    EvalM F env st (App Opapp
+        [Var (Long (strlit "TextIO") (Short (strlit "inputLinesFrom"))); exp])
       (MONAD (OPTION_TYPE (LIST_TYPE STRING_TYPE)) exc_ty (inputLinesFrom f))
       (MONAD_IO,p:'ffi ffi_proj)
 Proof

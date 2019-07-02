@@ -33,9 +33,9 @@ val _ = translate get_in_def;
 val _ = ml_prog_update open_local_in_block;
 
 val _ = ml_prog_update (add_dec
-  ``Dtabbrev unknown_loc [] "instream" (Atapp [] (Short "instream"))`` I);
+  ``Dtabbrev unknown_loc [] (strlit "instream") (Atapp [] (Short (strlit "instream")))`` I);
 val _ = ml_prog_update (add_dec
-  ``Dtabbrev unknown_loc [] "outstream" (Atapp [] (Short "outstream"))`` I);
+  ``Dtabbrev unknown_loc [] (strlit "outstream") (Atapp [] (Short (strlit "outstream")))`` I);
 
 val _ = process_topdecs `
   exception BadFileName;
@@ -46,7 +46,7 @@ val _ = process_topdecs `
 val _ = ml_prog_update open_local_block;
 
 fun get_exn_conv name =
-  EVAL ``lookup_cons (Short ^name) ^(get_env (get_ml_prog_state ()))``
+  EVAL ``lookup_cons (Short (strlit ^name)) ^(get_env (get_ml_prog_state ()))``
   |> concl |> rand |> rand |> rand
 
 val BadFileName = get_exn_conv ``"BadFileName"``

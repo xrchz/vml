@@ -277,9 +277,9 @@ val name_def = Define `
 
 Theorem EvalM_name:
    Eval env exp (UNIT_TYPE u) /\
-    (nsLookup env.v (Long "CommandLine" (Short "name")) =
+    (nsLookup env.v (Long (strlit "CommandLine") (Short (strlit "name"))) =
       SOME CommandLine_name_v) ==>
-    EvalM F env st (App Opapp [Var (Long "CommandLine" (Short "name")); exp])
+    EvalM F env st (App Opapp [Var (Long (strlit "CommandLine") (Short (strlit "name"))); exp])
       (MONAD STRING_TYPE exc_ty (name u))
       (COMMANDLINE,p:'ffi ffi_proj)
 Proof
@@ -307,9 +307,9 @@ val arguments_def = Define `
 
 Theorem EvalM_arguments:
    Eval env exp (UNIT_TYPE u) /\
-    (nsLookup env.v (Long "CommandLine" (Short "arguments")) =
+    (nsLookup env.v (Long (strlit "CommandLine") (Short (strlit "arguments"))) =
        SOME CommandLine_arguments_v) ==>
-    EvalM F env st (App Opapp [Var (Long "CommandLine" (Short "arguments")); exp])
+    EvalM F env st (App Opapp [Var (Long (strlit "CommandLine") (Short (strlit "arguments"))); exp])
       (MONAD (LIST_TYPE STRING_TYPE) exc_ty (arguments u))
       (COMMANDLINE,p:'ffi ffi_proj)
 Proof
