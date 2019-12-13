@@ -105,7 +105,7 @@ Datatype:
 End
 
 
-Definition matchArgs_def:
+Definition matchArg_def:
   matchArg [] arg mOpt a =
     (if isFlag arg then INL (implode "Unrecognized flag: " ^ showFlag arg)
      (* TODO: Check for extra options *)
