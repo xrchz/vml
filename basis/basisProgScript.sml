@@ -2,11 +2,12 @@
   Contains the code for the entire CakeML basis library in basis_def.
 *)
 open preamble ml_translatorLib ml_progLib cfLib basisFunctionsLib
-     CommandLineProofTheory TextIOProofTheory RuntimeProofTheory PrettyPrinterProgTheory
+     CommandLineProofTheory TextIOProofTheory RuntimeProofTheory
+     ArgParseProgTheory
 
 val _ = new_theory "basisProg"
 
-val _ = translation_extends"PrettyPrinterProg";
+val _ = translation_extends"ArgParseProg";
 
 val print_e = ``Var(Long"TextIO"(Short"print"))``
 val eval_thm = let
