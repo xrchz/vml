@@ -1,6 +1,9 @@
 Contains the beginnings of a standard basis library for CakeML,
 similar to the standard basis library of SML.
 
+[ArgParseProgScript.sml](ArgParseProgScript.sml):
+Module for parsing flags given as command-line arguments.
+
 [ArrayProgScript.sml](ArrayProgScript.sml):
 A module about Arrays for the CakeML standard basis library.
 
