@@ -6,7 +6,7 @@ open preamble ml_translatorLib ml_progLib PrettyPrinterProgTheory
 
 val _ = new_theory"ArgParseProg";
 
-val _ = translation_extends "PrettyPrinter";
+val _ = translation_extends "PrettyPrinterProg";
 
 val _ = ml_prog_update (open_module "ArgParse");
 
