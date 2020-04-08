@@ -1064,6 +1064,35 @@ val _ = Define `
   )))`;
 
 
+(* Make sense of the args of Eval *)
+(*val do_eval : list v -> maybe (sem_env v * exp * sem_env v * list dec)*)
+val _ = Define `
+ (do_eval vs=  
+ ((case vs of
+    [compiler_v; env_v; decs_v] =>
+      (case (do_opapp [compiler_v; Conv NONE [env_v; decs_v]],
+          v_to_env env_v, v_to_decs decs_v) of
+        (SOME (env1, x), SOME env2, SOME decs) => SOME (env1, x, env2, decs)
+      | _ => NONE
+      )
+  | _ => NONE
+  )))`;
+
+
+(* Make sense of the result of an Eval compiler call *)
+(*val eval_res : v -> maybe (list v * list v * v)*)
+val _ = Define `
+ (eval_res v=  
+ ((case v of
+    Conv NONE [words_v; bytes_v; res] =>
+      (case (v_to_list words_v, v_to_list bytes_v) of
+        (SOME words, SOME bytes) => SOME (words, bytes, res)
+      | _ => NONE
+      )
+  | _ => NONE
+  )))`;
+
+
 (*val copy_array : forall 'a. list 'a * integer -> integer -> maybe (list 'a * integer) -> maybe (list 'a)*)
 val _ = Define `
  (copy_array (src,srcoff) len d=  
@@ -1187,8 +1216,8 @@ val _ = Define `
         SOME ((s,t), Rval (Litv (Word8 (opw8_lookup op w1 w2))))
     | (Opw W64 op, [Litv (Word64 w1); Litv (Word64 w2)]) =>
         SOME ((s,t), Rval (Litv (Word64 (opw64_lookup op w1 w2))))
-    | (FP_top top, [Litv (Word64 w1); Litv (Word64 w2); Litv (Word64 w3)]) =>
-        SOME ((s,t), Rval (Litv (Word64 (fp_top top w1 w2 w3))))
+    | (FP_top t_op, [Litv (Word64 w1); Litv (Word64 w2); Litv (Word64 w3)]) =>
+        SOME ((s,t), Rval (Litv (Word64 (fp_top t_op w1 w2 w3))))
     | (FP_bop bop, [Litv (Word64 w1); Litv (Word64 w2)]) =>
         SOME ((s,t),Rval (Litv (Word64 (fp_bop bop w1 w2))))
     | (FP_uop uop, [Litv (Word64 w)]) =>

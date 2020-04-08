@@ -868,6 +868,31 @@ let v_to_env v =
   | _ -> Nothing
   end
 
+(* Make sense of the args of Eval *)
+val do_eval : list v -> maybe (sem_env v * exp * sem_env v * list dec)
+let do_eval vs =
+  match vs with
+  | [compiler_v; env_v; decs_v] ->
+      match (do_opapp [compiler_v; Conv Nothing [env_v; decs_v]],
+          v_to_env env_v, v_to_decs decs_v) with
+      | (Just (env1, x), Just env2, Just decs) -> Just (env1, x, env2, decs)
+      | _ -> Nothing
+      end
+  | _ -> Nothing
+  end
+
+(* Make sense of the result of an Eval compiler call *)
+val eval_res : v -> maybe (list v * list v * v)
+let eval_res v =
+  match v with
+  | Conv Nothing [words_v; bytes_v; res] ->
+      match (v_to_list words_v, v_to_list bytes_v) with
+      | (Just words, Just bytes) -> Just (words, bytes, res)
+      | _ -> Nothing
+      end
+  | _ -> Nothing
+  end
+
 val copy_array : forall 'a. list 'a * integer -> integer -> maybe (list 'a * integer) -> maybe (list 'a)
 let copy_array (src,srcoff) len d =
   if srcoff < 0 || len < 0 || List.length src < natFromInteger(srcoff + len) then Nothing else

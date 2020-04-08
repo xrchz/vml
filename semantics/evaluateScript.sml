@@ -107,22 +107,31 @@ val _ = Define `
               evaluate (dec_clock st') env' [e]
         | NONE => (st', Rerr (Rabort Rtype_error))
         )
-      else if op = Eval then
-        (case vs of
-          envv :: dsv :: [] =>
-            (case (v_to_env envv, v_to_decs dsv) of
-              (SOME env1, SOME ds) =>
-                if st'.clock =( 0 : num) then
-                  (st', Rerr (Rabort Rtimeout_error))
-                else
-                  (case fix_clock (dec_clock st') (evaluate_decs (dec_clock st') env1 ds) of
-                    (st2, Rval env2) => (st2, Rval [Env (extend_dec_env env2 env1)])
-                  | (st2, Rerr e) => (st2, Rerr e)
-                  )
-            | _ => (st', Rerr (Rabort Rtype_error))
-            )
-        | _ => (st', Rerr (Rabort Rtype_error))
-        )
+      else if op = Eval then  
+  (case do_eval (REVERSE vs) of
+        NONE => (st', Rerr (Rabort Rtype_error))
+    | SOME (c_env, c_exp, e_env, e_decs) =>
+  if st'.clock = ( 0 : num) then (st', Rerr (Rabort Rtimeout_error)) else
+    (case fix_clock (dec_clock st') (evaluate (dec_clock st') c_env [c_exp]) of
+          (st'', Rval [r]) =>
+    (case eval_res r of
+          NONE => (st'', Rerr (Rabort Rtype_error))
+      | SOME ([], _, r) => (st'', Rval [Conv NONE [Env e_env; r]])
+      | SOME (_, _, r) =>
+    if st''.clock = ( 0 : num) then (st'', Rerr (Rabort Rtimeout_error)) else
+      (case fix_clock (dec_clock st'')
+              (evaluate_decs (dec_clock st'') e_env e_decs) of
+            (st''', Rval env') => (st''', Rval
+                                            [Conv NONE
+                                               [Env
+                                                  (extend_dec_env env' e_env); r]])
+        | (st''', Rerr e) => (st''', Rerr e)
+      )
+    )
+      | (st'', Rval _) => (st'', Rerr (Rabort Rtimeout_error))
+      | (st'', Rerr e) => (st'', Rerr e)
+    )
+  )
       else
         (case do_app (st'.refs,st'.ffi) op (REVERSE vs) of
           SOME ((refs,ffi),r) => (( st' with<| refs := refs; ffi := ffi |>), list_result r)
