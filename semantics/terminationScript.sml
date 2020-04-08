@@ -269,7 +269,8 @@ val (evaluate_def, evaluate_ind) =
   rw[size_abbrevs,exp_size_def,dec_clock_def,LESS_OR_EQ,
      do_if_def,do_log_def] >>
   imp_res_tac fix_clock_IMP >>
-  simp[SIMP_RULE(srw_ss())[]exps_size_thm,MAP_REVERSE,SUM_REVERSE]);
+  simp[SIMP_RULE(srw_ss())[]exps_size_thm,MAP_REVERSE,SUM_REVERSE] >>
+  fs [pairTheory.LEX_DEF_THM]);
 
 (* tidy up evalute_def and evaluate_ind *)
 
