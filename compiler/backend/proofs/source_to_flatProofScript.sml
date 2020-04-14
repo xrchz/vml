@@ -3056,10 +3056,10 @@ Proof
   )
   \\ first_x_assum (drule_then (drule_then drule))
   \\ disch_then (qspec_then ‘t’ mp_tac)
-  (* trace has to be picked the annoying way because of the Eval case *)
   \\ rw []
   \\ Cases_on `op = Eval`
   >- (
+
     fs []
     \\ simp [astOp_to_flatOp_def, evaluate_def]
     \\ fs [list_case_eq, option_case_eq]
