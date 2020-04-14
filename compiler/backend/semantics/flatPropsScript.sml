@@ -281,7 +281,7 @@ Theorem evaluate_length:
 Proof
   ho_match_mp_tac (evaluate_ind |> Q.SPECL [`P`, `\_ _. T`, `\_ _. T`]
     |> SIMP_RULE bool_ss [] |> Q.GEN `P`) >>
-  srw_tac[][evaluate_def] >> srw_tac[][] >>
+  srw_tac[][evaluate_def, LET_DEF] >> srw_tac[][] >>
   every_case_tac >> full_simp_tac(srw_ss())[] >> srw_tac[][]
 QED
 
@@ -328,7 +328,7 @@ QED
 
 Theorem do_app_state_unchanged:
   !c s op vs s' r. do_app s op vs = SOME (s', r) ⇒
-     s'.c = s.c ∧ s'.eval_mode = s.eval_mode
+     s'.c = s.c ∧ s'.eval_mode = s.eval_mode ∧ s'.clock = s.clock
 Proof
   rw [do_app_cases] >>
   fs [semanticPrimitivesTheory.store_assign_def] >>
@@ -362,81 +362,29 @@ Proof
   metis_tac [PAIR_EQ]
 QED
 
-val do_app_add_to_clock = Q.prove (
-  `do_app ^s op es = SOME (t, r)
-   ==>
-   do_app (s with clock := s.clock + k) op es =
-     SOME (t with clock := t.clock + k, r)`,
-  rw [do_app_cases] \\ fs []);
-
-val do_app_add_to_clock_NONE = Q.prove (
-  `do_app ^s op es = NONE
-   ==>
-   do_app (s with clock := s.clock + k) op es = NONE`,
-  Cases_on `op` \\ rw [do_app_def]
-  \\ fs [case_eq_thms, pair_case_eq] \\ rw [] \\ fs []
-  \\ rpt (pairarg_tac \\ fs [])
-  \\ fs [bool_case_eq, case_eq_thms]
-  \\ fs [IS_SOME_EXISTS,CaseEq"option",CaseEq"store_v"]);
-
-Theorem do_eval_clock_change:
-  do_eval vs (s with clock updated_by f) = (case do_eval vs s of
-      NONE => NONE
-    | SOME (r, s', v) => SOME (r, (s' with clock updated_by f), v))
+Triviality do_app_clock_change:
+  do_app ((^s) with clock := clk) op es =
+     (case do_app s op es of NONE => NONE
+        | SOME (t, r) => SOME (t with clock := clk, r))
 Proof
-  TOP_CASE_TAC
-  \\ fs [do_eval_def, CaseEq "eval_config", list_case_eq, option_case_eq]
-  \\ rpt (pairarg_tac \\ fs [])
-  \\ fs [option_case_eq, pair_case_eq]
-  \\ rveq \\ fs []
-QED
-
-val do_eval_add_to_clock = REWRITE_RULE
-    [ASSUME ``do_eval vs s = SOME (r, t, v)``] do_eval_clock_change
-  |> DISCH_ALL
-
-val do_eval_add_to_clock_NONE = REWRITE_RULE
-    [ASSUME ``do_eval vs s = NONE``] do_eval_clock_change
-  |> DISCH_ALL
-
-Theorem evaluate_add_to_clock:
-   (∀env ^s es s' r.
-       evaluate env s es = (s',r) ∧
-       r ≠ Rerr (Rabort Rtimeout_error) ⇒
-       evaluate env (s with clock := s.clock + extra) es =
-         (s' with clock := s'.clock + extra,r)) ∧
-   (∀^s d s' r.
-       evaluate_dec s d = (s',r) ∧
-       r ≠ SOME (Rabort Rtimeout_error) ⇒
-       evaluate_dec (s with clock := s.clock + extra) d =
-         (s' with clock := s'.clock + extra,r)) ∧
-   (∀^s ds s' r.
-       evaluate_decs s ds = (s',r) ∧
-       r ≠ SOME (Rabort Rtimeout_error) ⇒
-       evaluate_decs (s with clock := s.clock + extra) ds =
-         (s' with clock := s'.clock + extra,r))
-Proof
-  ho_match_mp_tac evaluate_ind \\ rw [evaluate_def]
-  \\ fs [case_eq_thms, pair_case_eq] \\ rw [] \\ fs [PULL_EXISTS]
-  \\ rw [] \\ fs [pmatch_ignore_clock]
-  \\ fs [case_eq_thms, pair_case_eq, bool_case_eq, CaseEq"match_result"] \\ rw []
-  \\ fs [dec_clock_def]
-  \\ fs [do_eval_clock_change]
-  \\ map_every imp_res_tac
-      [do_app_add_to_clock_NONE,
-       do_app_add_to_clock,
-       do_eval_clock] \\ fs []
-  \\ every_case_tac \\ fs []
-QED
-
-Theorem evaluate_decs_add_to_clock:
-  ∀decs s s' r.
-   r ≠ SOME (Rabort Rtimeout_error) ∧
-   evaluate_decs s decs = (s',r) ⇒
-   evaluate_decs (s with clock := s.clock + extra) decs =
-   (s' with clock := s'.clock + extra,r)
-Proof
-  metis_tac [evaluate_add_to_clock]
+  reverse CASE_TAC
+  >- (
+    Cases_on `x`
+    \\ pop_assum (assume_tac o REWRITE_RULE [do_app_cases])
+    \\ fs [] \\ rveq \\ fs []
+    \\ rveq \\ fs []
+    \\ rfs []
+    \\ simp [do_app_def]
+  )
+  >- (
+    Cases_on `op`
+    \\ pop_assum (mp_tac o REWRITE_RULE [do_app_def]) \\ rw []
+    \\ fs [case_eq_thms, pair_case_eq] \\ rw [] \\ fs []
+    \\ rpt (pairarg_tac \\ fs [])
+    \\ fs [do_app_def, bool_case_eq, case_eq_thms]
+    \\ rw []
+    \\ fs [IS_SOME_EXISTS,CaseEq"option",CaseEq"store_v"]
+  )
 QED
 
 Theorem do_app_io_events_mono:
@@ -453,71 +401,96 @@ Proof
 QED
 
 Theorem evaluate_io_events_mono:
-   (∀env ^s es.
-      s.ffi.io_events ≼ (FST (evaluate env s es)).ffi.io_events) ∧
-   (∀^s d.
-      s.ffi.io_events ≼ (FST (evaluate_dec s d)).ffi.io_events) ∧
-   (∀^s ds.
-      s.ffi.io_events ≼ (FST (evaluate_decs s ds)).ffi.io_events)
+   (∀env ^s es s' r.
+      evaluate env s es = (s', r) ==>
+      s.ffi.io_events ≼ s'.ffi.io_events) ∧
+   (∀^s d s' r.
+      evaluate_dec s d = (s', r) ==>
+      s.ffi.io_events ≼ s'.ffi.io_events) ∧
+   (∀^s ds s' r.
+      evaluate_decs s ds = (s', r) ==>
+      s.ffi.io_events ≼ s'.ffi.io_events)
 Proof
   ho_match_mp_tac evaluate_ind \\ rw [evaluate_def]
   \\ every_case_tac \\ fs [] \\ rfs []
+  \\ rveq \\ fs []
   \\ fs [dec_clock_def]
   \\ imp_res_tac do_app_io_events_mono \\ fs []
-  \\ imp_res_tac do_eval_clock \\ fs []
+  \\ fsrw_tac [SATISFY_ss] [IS_PREFIX_TRANS]
   \\ metis_tac [IS_PREFIX_TRANS]
 QED
 
-Theorem with_clock_ffi:
-   (s with clock := k).ffi = s.ffi
+(* captures the relationship between two evaluate results for different
+   clock amounts *)
+Definition clock_io_mono_res_rel_def:
+  clock_io_mono_res_rel timeout ex res1 res2 = (case (res1, res2) of
+        ((s1, r1), (s2, r2)) =>
+        s1.ffi.io_events ≼ s2.ffi.io_events /\
+        (r1 <> timeout ==> r2 = r1 /\ s2 = (s1 with clock := ex + s1.clock)))
+End
+
+(* complicated looking theorem organises a case split on timeouts, makes
+   some of the transitivity reasoning implicit, and reduces the number of
+   cases in the evaluate proof *)
+Theorem clock_io_mono_res_rel_split:
+    !pre_timeout.
+    (clock_io_mono_res_rel pre_timeout ex res1 res2) /\
+    (! r s1 s2. res1 = (s1, pre_timeout) /\ res2 = (s2, r) ==>
+        (case g1 s1 pre_timeout of (s_fin, r_fin) =>
+            s_fin = s1 /\ r_fin = timeout) /\
+        (case g2 s2 r of (s3, _) => s2.ffi.io_events ≼ s3.ffi.io_events)) /\
+    (! r s. res1 = (s, r) /\
+        res2 = (s with clock := ex + s.clock, r) /\
+        r <> pre_timeout ==>
+        clock_io_mono_res_rel timeout ex (g1 s r)
+            (g2 (s with clock := ex + s.clock) r)) ==>
+    clock_io_mono_res_rel timeout ex
+        (pair_CASE res1 g1) (pair_CASE res2 g2)
 Proof
-  EVAL_TAC
+  rw [clock_io_mono_res_rel_def]
+  \\ every_case_tac
+  \\ fs []
+  \\ imp_res_tac IMP_DISJ_THM
+  \\ fs [] \\ rfs []
+  \\ rveq \\ fs []
+  \\ fsrw_tac [SATISFY_ss] [IS_PREFIX_TRANS]
 QED
 
-Theorem evaluate_add_to_clock_io_events_mono:
-   (∀env ^s es extra.
-       (FST (evaluate env s es)).ffi.io_events ≼
-       (FST (evaluate env (s with clock := s.clock + extra) es)).ffi.io_events)
-   ∧
-   (∀^s d extra.
-       (FST (evaluate_dec s d)).ffi.io_events ≼
-       (FST (evaluate_dec (s with clock := s.clock + extra) d)).ffi.io_events) ∧
-   (∀^s ds extra.
-       (FST (evaluate_decs s ds)).ffi.io_events ≼
-       (FST (evaluate_decs (s with clock := s.clock + extra) ds)).ffi.io_events)
-Proof
-  ho_match_mp_tac evaluate_ind \\ rw [evaluate_def] \\ fs []
-  \\ rpt (PURE_FULL_CASE_TAC \\ fs []) \\ rfs []
-  \\ map_every imp_res_tac [evaluate_add_to_clock,
-                            evaluate_io_events_mono,
-                            do_app_add_to_clock_NONE,
-                            do_app_add_to_clock,
-                            do_eval_add_to_clock_NONE,
-                            do_eval_add_to_clock,
-                            do_eval_clock]
-  \\ fs [dec_clock_def, pmatch_ignore_clock]
-  \\ rw [] \\ fs [] \\ rw [] \\ fs []
-  \\ imp_res_tac do_eval_clock \\ rfs []
-  \\ metis_tac [IS_PREFIX_TRANS, FST, PAIR,
-                evaluate_io_events_mono,
-                with_clock_ffi,
-                do_app_io_events_mono]
-QED
+Overload io_mono1[local] =
+  ``clock_io_mono_res_rel (Rerr (Rabort Rtimeout_error))``
+Overload io_mono2[local] =
+  ``clock_io_mono_res_rel (SOME (Rabort Rtimeout_error))``
 
-Theorem evaluate_dec_io_events_mono:
-  ∀z y.
-     y.ffi.io_events ≼ (FST (evaluate_dec y z)).ffi.io_events
-Proof
-  Cases \\ rw [evaluate_def] \\ every_case_tac \\ fs [] \\ rw []
-  \\ metis_tac [evaluate_io_events_mono, FST]
-QED;
+Triviality io_mono_split1 = Q.ISPEC
+  `Rerr (Rabort Rtimeout_error) : ('x, 'y) result`
+  clock_io_mono_res_rel_split
+Triviality io_mono_split2 = Q.ISPEC
+  `SOME (Rabort Rtimeout_error) : 'x error_result option`
+  clock_io_mono_res_rel_split
+Triviality io_mono_tup = clock_io_mono_res_rel_def
+    |> SPEC_ALL |> Q.INST [`res2` |-> `(s2, r)`]
 
-Theorem evaluate_dec_add_to_clock_io_events_mono:
-  ∀prog ^s extra.
-   (FST (evaluate_dec s prog)).ffi.io_events ≼
-   (FST (evaluate_dec (s with clock := s.clock + extra) prog)).ffi.io_events
+Theorem evaluate_clock_io_mono_rel:
+   (∀env ^s es. io_mono1 ex (evaluate env s es)
+        (evaluate env (s with clock := ex + s.clock) es)) ∧
+   (∀ ^s d. io_mono2 ex (evaluate_dec s d)
+        (evaluate_dec (s with clock := ex + s.clock) d)) ∧
+   (∀ ^s ds. io_mono2 ex (evaluate_decs s ds)
+        (evaluate_decs (s with clock := ex + s.clock) ds))
 Proof
-  metis_tac [evaluate_add_to_clock_io_events_mono]
+  ho_match_mp_tac evaluate_ind \\ rw [evaluate_def, LET_DEF]
+  \\ rpt (FIRST [irule io_mono_split1, irule io_mono_split2,
+    CHANGED_TAC (rw [io_mono_tup]), TOP_CASE_TAC])
+  \\ fs [case_eq_thms, pair_case_eq, bool_case_eq, CaseEq"match_result",
+    Q.ISPEC `(a, b)` EQ_SYM_EQ, do_app_clock_change]
+  \\ rveq \\ fs []
+  \\ fs [clock_io_mono_res_rel_def, dec_clock_def]
+  \\ rpt TOP_CASE_TAC
+  \\ imp_res_tac evaluate_io_events_mono
+  \\ imp_res_tac do_app_io_events_mono
+  \\ imp_res_tac do_app_state_unchanged
+  \\ rveq \\ fs []
+  \\ fsrw_tac [SATISFY_ss] [IS_PREFIX_TRANS]
 QED
 
 Theorem evaluate_decs_io_events_mono:
@@ -529,13 +502,15 @@ Proof
   \\ fs []
 QED
 
-Theorem evaluate_decs_add_to_clock_io_events_mono:
-   ∀ds ^s extra.
-     (FST (evaluate_decs s ds)).ffi.io_events ≼
-     (FST (evaluate_decs (s with clock := s.clock + extra) ds)).ffi.io_events
+Theorem evaluate_decs_add_to_clock_io_events_mono_alt:
+    evaluate_decs ^s ds = (s1,res) /\
+    evaluate_decs (s with clock := s.clock + extra) ds = (s2,res2) ==>
+    s1.ffi.io_events ≼ s2.ffi.io_events
 Proof
-  metis_tac [evaluate_add_to_clock_io_events_mono]
-QED;
+  assume_tac (List.last (BODY_CONJUNCTS evaluate_clock_io_mono_rel)
+    |> Q.INST [`ex` |-> `extra`])
+  \\ rw [] \\ fs [clock_io_mono_res_rel_def]
+QED
 
 Theorem evaluate_MAP_Var_local:
   MAP (ALOOKUP env.v) xs = MAP SOME vs ⇒
@@ -647,24 +622,35 @@ Proof
   \\ rw[Once pmatch_nil]
 QED
 
-val evaluate_decs_add_to_clock_initial_state = Q.prove(
-  `r ≠ SOME (Rabort Rtimeout_error) ∧
-   evaluate_decs (initial_state ffi k ec) decs = (s',r) ⇒
-   evaluate_decs (initial_state ffi (ck + k) ec) decs =
-   (s' with clock := s'.clock + ck,r)`,
-  rw [initial_state_def]
-  \\ imp_res_tac evaluate_decs_add_to_clock \\ fs []);
-
-val evaluate_decs_add_to_clock_initial_state_io_events_mono = Q.prove (
-  `evaluate_decs (initial_state ffi k ec) prog = (s',r) ==>
-   s'.ffi.io_events ≼
-   (FST (evaluate_decs (initial_state ffi (k+ck) ec) prog)).ffi.io_events`,
-  rw [initial_state_def]
-  \\ qmatch_assum_abbrev_tac `evaluate_decs s1 _ = _`
-  \\ qispl_then
-         [`prog`,`s1`,`ck`] mp_tac
-         (evaluate_decs_add_to_clock_io_events_mono)
-  \\ fs [Abbr`s1`]);
+Triviality evaluate_decs_initial_state_clocks:
+  evaluate_decs (initial_state ffi k1 ec) decs = (s1, r1) ==>
+  evaluate_decs (initial_state ffi k2 ec) decs = (s2, r2) ==>
+  (k1 = k2 /\ s1 = s2 /\ r1 = r2
+    \/ r1 = SOME (Rabort Rtimeout_error) /\ k1 < k2 /\
+        s1.ffi.io_events ≼ s2.ffi.io_events
+    \/ r2 = SOME (Rabort Rtimeout_error) /\ k2 < k1 /\
+        s2.ffi.io_events ≼ s1.ffi.io_events
+    \/ r1 <> SOME (Rabort Rtimeout_error) /\ r1 = r2 /\
+        ((?k3. k2 = k1 + k3 /\ s2 = s1 with clock := s1.clock + k3)
+            \/ (?k3. k1 = k2 + k3 /\ s1 = s2 with clock := s2.clock + k3)))
+Proof
+  rw []
+  \\ Cases_on `k1 = k2` \\ fs []
+  \\ qspecl_then
+    [`if k1 < k2 then k2 - k1 else k1 - k2`,
+        `initial_state ffi (if k1 < k2 then k1 else k2) ec`, `decs`]
+    mp_tac (List.last (CONJUNCTS evaluate_clock_io_mono_rel) |> GEN_ALL)
+  \\ CASE_TAC
+  \\ fs [clock_io_mono_res_rel_def, initial_state_def]
+  \\ rw []
+  \\ imp_res_tac IMP_DISJ_THM \\ fs []
+  \\ rfs []
+  \\ rveq \\ fs []
+  \\ Cases_on `r1 = SOME (Rabort Rtimeout_error)`
+  \\ simp []
+  \\ TRY (qexists_tac `k2 - k1` \\ simp [] \\ NO_TAC)
+  \\ TRY (qexists_tac `k1 - k2` \\ simp [] \\ NO_TAC)
+QED
 
 val initial_state_with_clock = Q.prove (
   `(initial_state ffi k ec with clock := (initial_state ffi k ec).clock + ck) =
@@ -715,14 +701,10 @@ Proof
       \\ first_x_assum drule
       \\ impl_tac >- (strip_tac \\ fs[])
       \\ strip_tac
-      \\ imp_res_tac evaluate_decs_add_to_clock_initial_state
-      \\ fs[]
-      \\ first_x_assum(qspec_then`ck+k`mp_tac)
-      \\ simp[]
-      \\ Cases_on`res2` \\ Cases_on`r` \\ fs[]
-      \\ TRY(rpt(first_x_assum(qspec_then`k'`mp_tac)) \\ simp[] \\ NO_TAC)
-      \\ every_case_tac \\ fs[] \\ rveq \\ fs[]
-      \\ TRY(rpt(first_x_assum(qspec_then`k'`mp_tac)) \\ simp[] \\ NO_TAC))
+      \\ every_case_tac \\ fs [] \\ rveq \\ fs []
+      \\ dxrule_then drule evaluate_decs_initial_state_clocks
+      \\ simp []
+    )
     \\ DEEP_INTRO_TAC some_intro \\ fs []
     \\ conj_tac
     >- (
@@ -731,16 +713,10 @@ Proof
       \\ first_x_assum drule
       \\ impl_tac >- (strip_tac \\ fs[])
       \\ strip_tac
-      \\ imp_res_tac evaluate_decs_add_to_clock_initial_state
-      \\ fs[]
-      \\ first_x_assum(fn th => mp_tac th \\ impl_tac >- (strip_tac \\ fs[]) \\ strip_tac)
-      \\ first_x_assum(fn th => mp_tac th \\ impl_tac >- (strip_tac \\ fs[]) \\ strip_tac)
-      \\ first_x_assum(fn th => mp_tac th \\ impl_tac >- (every_case_tac \\ fs[]) \\ strip_tac)
-      \\ first_x_assum(qspec_then`k'`mp_tac) \\ fs[]
-      \\ first_x_assum(qspec_then`ck+k`mp_tac) \\ fs[]
-      \\ ntac 2 strip_tac
-      \\ rveq \\ fs[state_component_equality]
-      \\ every_case_tac \\ fs[])
+      \\ dxrule_then drule evaluate_decs_initial_state_clocks
+      \\ rw []
+      \\ every_case_tac \\ fs []
+    )
     \\ fs[eval_sim_def]
     \\ first_x_assum drule
     \\ impl_tac >- (strip_tac \\ fs[])
@@ -758,8 +734,8 @@ Proof
     \\ last_x_assum drule
     \\ impl_keep_tac >- metis_tac []
     \\ strip_tac \\ fs []
-    \\ imp_res_tac evaluate_decs_add_to_clock_initial_state \\ fs []
-    \\ rveq \\ fs []
+    \\ dxrule_then drule evaluate_decs_initial_state_clocks
+    \\ rw []
     \\ every_case_tac \\ fs [])
   \\ DEEP_INTRO_TAC some_intro
   \\ fs [] \\ rw []
@@ -774,10 +750,9 @@ Proof
     \\ impl_keep_tac >- metis_tac []
     \\ strip_tac \\ fs []
     \\ last_x_assum drule
-    \\ imp_res_tac evaluate_decs_add_to_clock_initial_state \\ fs []
-    \\ imp_res_tac evaluate_decs_add_to_clock_initial_state_io_events_mono
-    \\ fs [] \\ rveq
-    \\ every_case_tac \\ fs [] \\ rw [] \\ fs [])
+    \\ dxrule_then drule evaluate_decs_initial_state_clocks
+    \\ rw []
+    \\ every_case_tac \\ fs [])
   \\ qmatch_abbrev_tac `build_lprefix_lub l1 = build_lprefix_lub l2`
   \\ `(lprefix_chain l1 /\ lprefix_chain l2) /\ equiv_lprefix_chain l1 l2`
      suffices_by metis_tac [build_lprefix_lub_thm,
@@ -792,10 +767,12 @@ Proof
     \\ match_mp_tac prefix_chain_lprefix_chain
     \\ simp [prefix_chain_def, PULL_EXISTS]
     \\ qx_genl_tac [`k1`,`k2`]
-    \\ qspecl_then [`k1`,`k2`] mp_tac LESS_EQ_CASES
-    \\ strip_tac \\ fs [LESS_EQ_EXISTS] \\ rveq
-    \\ metis_tac [evaluate_decs_add_to_clock_io_events_mono,
-                  initial_state_with_clock])
+    \\ simp [GSYM miscTheory.FST_pair]
+    \\ rpt (pairarg_tac \\ fs [])
+    \\ dxrule_then drule evaluate_decs_initial_state_clocks
+    \\ rw []
+    \\ simp []
+  )
   \\ simp [equiv_lprefix_chain_thm]
   \\ unabbrev_all_tac \\ simp [PULL_EXISTS]
   \\ simp [LNTH_fromList, PULL_EXISTS, GSYM FORALL_AND_THM]
@@ -813,9 +790,11 @@ Proof
   \\ `ffi1.io_events ≼ t2.ffi.io_events`
      suffices_by (rw [] \\ fs [IS_PREFIX_APPEND] \\ simp [EL_APPEND1])
   \\ qunabbrev_tac `ffi1`
-  \\ metis_tac
-        [evaluate_decs_add_to_clock_io_events_mono,
-         initial_state_with_clock, FST, ADD_SYM]
+  \\ simp [GSYM miscTheory.FST_pair]
+  \\ rpt (pairarg_tac \\ fs [])
+  \\ dxrule_then drule evaluate_decs_initial_state_clocks
+  \\ rw []
+  \\ simp []
 QED
 
 val op_gbag_def = Define `
@@ -919,16 +898,6 @@ Proof
   \\ qid_spec_tac `env`
   \\ qid_spec_tac `funs`
   \\ Induct \\ fs [FORALL_PROD]
-QED
-
-Theorem evaluate_decs_add_to_clock_io_events_mono_alt:
-    evaluate_decs ^s ds = (s1,res) /\
-    evaluate_decs (s with clock := s.clock + extra) ds = (s2,res2) ==>
-    s1.ffi.io_events ≼ s2.ffi.io_events
-Proof
-  rw []
-  \\ assume_tac (SPEC_ALL evaluate_decs_add_to_clock_io_events_mono)
-  \\ rfs []
 QED
 
 (* generic proof support for most val_rel/state_rel examples *)
