@@ -1223,12 +1223,12 @@ Proof
 QED
 
 Theorem do_eval_install:
-  do_eval xs s = SOME res /\
+  do_eval xs s.eval_mode = SOME res /\
   state_rel s t /\
   LIST_REL v_rel xs ys ==>
-  ?decs exps s' t'. state_rel s' t' /\
-  res = (decs, s', Unitv) /\
-  do_install ys t = (if t'.clock = 0
+  ?decs exps em' t'. state_rel (s with eval_mode := em') t' /\
+  res = (NONE, decs, em', Unitv) /\
+  do_install (REVERSE ys) t = (if t'.clock = 0
     then (Rerr (Rabort Rtimeout_error), t')
     else (Rval (exps ++ compile [] [Con None NONE []]), dec_clock 1 t')) /\
   no_Mat_decs decs /\
@@ -1239,8 +1239,7 @@ Proof
   \\ `install_config_rel s.eval_mode t.compile_oracle t.compile`
     by fs [state_rel_def]
   \\ Cases_on `s.eval_mode` \\ fs [install_config_rel_def]
-  \\ fs [do_eval_def, case_eq_thms, CaseEq "eval_config"]
-  \\ fs [listTheory.SWAP_REVERSE_SYM]
+  \\ fs [do_eval_def, case_eq_thms]
   \\ rpt (pairarg_tac \\ fs [])
   \\ rveq \\ fs [case_eq_thms, pair_case_eq]
   \\ rveq \\ fs []
@@ -1363,14 +1362,19 @@ Proof
     \\ fs [o_DEF])
   \\ Cases_on `op = Eval`
   THEN1 (
+
     simp [compile_op_def, evaluate_def]
-    \\ fs [case_eq_thms, pair_case_eq] \\ rveq \\ fs []
-    \\ drule do_eval_install
+    \\ fs [case_eq_thms]
+    \\ fs [pair_case_eq] \\ rveq \\ fs []
+    \\ drule (do_eval_install |> Q.INST [`ys` |-> `REVERSE rys`])
+    \\ simp []
     \\ rpt (disch_then drule)
     \\ strip_tac
-    \\ rename [`state_rel s2 t2`]
+    \\ qmatch_asmsub_abbrev_tac `state_rel s2 t2`
     \\ `s2.clock = t2.clock /\ state_rel (dec_clock s2) (dec_clock 1 t2)`
-        by fs [flatSemTheory.dec_clock_def,dec_clock_def,state_rel_def]
+        by (fs [markerTheory.Abbrev_def] \\ rveq \\ fs []
+         \\ fs[flatSemTheory.dec_clock_def,dec_clock_def,state_rel_def])
+    \\ fs [SWAP_REVERSE_SYM] \\ rveq \\ fs []
     \\ fs [bool_case_eq] \\ rveq \\ fs []
     \\ fs [Q.ISPEC `(x, y)` EQ_SYM_EQ, pair_case_eq]
     \\ fs []
@@ -1488,7 +1492,7 @@ Proof
   \\ CASE_TAC \\ fs []
 QED
 
-Theorem FST_SND_EQ_CASE:
+Theorem FST_SND_EQ_UNCURRY:
   FST = (\(a, b). a) /\ SND = (\(a, b). b)
 Proof
   simp [FUN_EQ_THM, FORALL_PROD]
@@ -1511,7 +1515,7 @@ Proof
      (
       qhdtm_x_assum`flatSem$evaluate_decs`kall_tac
       \\ last_x_assum(qspec_then`k'`mp_tac) \\ simp[]
-      \\ fs [FST_SND_EQ_CASE]
+      \\ fs [FST_SND_EQ_UNCURRY]
       \\ rpt (pairarg_tac \\ fs [])
       \\ drule_then drule compile_decs_correct2
       \\ simp [state_rel_initial_state]
@@ -1523,26 +1527,23 @@ Proof
       \\ qmatch_assum_abbrev_tac`flatSem$evaluate_decs ss es = _`
       \\ qmatch_assum_abbrev_tac`closSem$evaluate bp = _`
       \\ fs [option_case_eq,result_case_eq]
-      \\ drule (Q.GENL [`extra`, `res2`, `s2`]
-            evaluate_decs_add_to_clock_io_events_mono_alt)
+      \\ qspecl_then [`k'`, `ss`, `es`] mp_tac
+          (List.last (CONJUNCTS evaluate_clock_io_mono_rel) |> GEN_ALL)
+      \\ simp [clock_io_mono_res_rel_def]
+      \\ CASE_TAC \\ strip_tac \\ fs []
       \\ Q.ISPEC_THEN`bp`(mp_tac o Q.GEN`extra`)
             (CONJUNCT1 closPropsTheory.evaluate_add_to_clock_io_events_mono)
       \\ simp[Abbr`ss`,Abbr`bp`]
       \\ disch_then(qspec_then`k`strip_assume_tac)
-      \\ disch_then(qspec_then`k'`strip_assume_tac)
       \\ drule(GEN_ALL(SIMP_RULE std_ss [](CONJUNCT1 closPropsTheory.evaluate_add_to_clock)))
       \\ disch_then(qspec_then `k` mp_tac)
       \\ impl_tac >- rpt(PURE_FULL_CASE_TAC \\ fs[])
-      \\ drule(GEN_ALL(SIMP_RULE std_ss []
-           (ONCE_REWRITE_RULE [CONJ_COMM] flatPropsTheory.evaluate_decs_add_to_clock)))
-      \\ disch_then(qspec_then `k'` mp_tac)
-      \\ impl_tac >- rpt(PURE_FULL_CASE_TAC \\ fs[])
-      \\ ntac 2 strip_tac \\ fs[]
+      \\ strip_tac \\ fs[]
       \\ drule_then drule compile_decs_correct2
       \\ simp [flatPropsTheory.initial_state_clock,
                closPropsTheory.initial_state_clock,
                state_rel_initial_state]
-      \\ impl_tac >- (CCONTR_TAC \\ fs [])
+      \\ impl_tac >- (CCONTR_TAC \\ imp_res_tac IMP_DISJ_THM \\ fs [])
       \\ strip_tac \\ unabbrev_all_tac \\ fs[]
       \\ fs[initial_state_def] \\ rfs[]
       \\ rveq \\ fs []
@@ -1550,7 +1551,7 @@ Proof
       \\ fs[state_component_equality] \\ fs [state_rel_def])
     \\ qexists_tac `k`
     \\ simp [PAIR_FST_SND_EQ]
-    \\ simp [FST_SND_EQ_CASE]
+    \\ simp [FST_SND_EQ_UNCURRY]
     \\ pairarg_tac \\ fs []
     \\ drule_then drule compile_decs_correct2
     \\ simp [state_rel_initial_state]
@@ -1562,7 +1563,7 @@ Proof
   \\ simp[closSemTheory.semantics_def]
   \\ IF_CASES_TAC \\ fs [] >- (
     last_x_assum(qspec_then`k`strip_assume_tac)
-    \\ fs [FST_SND_EQ_CASE]
+    \\ fs [FST_SND_EQ_UNCURRY]
     \\ rpt (pairarg_tac \\ fs [])
     \\ rveq \\ fs []
     \\ drule_then drule compile_decs_correct2
@@ -1574,7 +1575,7 @@ Proof
   \\ conj_tac >- (
     spose_not_then strip_assume_tac
     \\ last_x_assum(qspec_then`k`mp_tac)
-    \\ simp [FST_SND_EQ_CASE]
+    \\ simp [FST_SND_EQ_UNCURRY]
     \\ rpt (pairarg_tac \\ fs [])
     \\ rveq \\ fs []
     \\ CCONTR_TAC
@@ -1586,7 +1587,7 @@ Proof
   \\ rpt (AP_TERM_TAC ORELSE AP_THM_TAC)
   \\ simp[FUN_EQ_THM] \\ gen_tac
   \\ rpt (AP_TERM_TAC ORELSE AP_THM_TAC)
-  \\ simp [FST_SND_EQ_CASE]
+  \\ simp [FST_SND_EQ_UNCURRY]
   \\ rpt (pairarg_tac \\ fs [])
   \\ drule_then drule compile_decs_correct2
   \\ simp [state_rel_initial_state]

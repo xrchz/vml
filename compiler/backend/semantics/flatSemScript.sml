@@ -682,7 +682,7 @@ val do_eval_def = Define `
     | flatSem$Install ic =>
       (case vs of
        | [v1; v2] =>
-         (case (v_to_bytes v1, v_to_words v2) of
+         (case (v_to_bytes v2, v_to_words v1) of
           | (SOME bytes, SOME data) =>
             let (st,decs) = ic.compile_oracle 0 in
             let new_oracle = shift_seq 1 ic.compile_oracle in

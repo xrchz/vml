@@ -640,7 +640,7 @@ Definition inc_compile_def:
   (glob_alloc st' (<| next := st |>) :: decs', env', st')
 End
 
-val _ = type_abbrev ("compiler_state", ``: next_indices``);
+Type compiler_state[local] = ``: next_indices``
 
 Inductive s_rel:
   (!genv s s'.
@@ -3003,9 +3003,27 @@ Proof
   >- metis_tac[LENGTH_MAP]
 QED
 
+Theorem do_eval_thm:
+  do_eval vs = SOME (c_env,c_exp,e_env,e_decs) /\
+  invariant genv idxs st st' /\
+  LIST_REL (v_rel genv) vs vs' ==>
+  ? comp_map env_i1 locals t1 ts decs' em' env_v.
+  do_eval vs' st'.eval_mode = SOME (SOME (env_i1,
+    compile_exp t1 (comp_map with v := bind_locals ts locals comp_map.v) c_exp),
+    decs', em', env_v) /\
+  env_all_rel genv comp_map c_env env_i1 locals ∧
+  LENGTH ts = LENGTH locals ∧
+  invariant genv idxs st (st' with eval_mode := em') ∧
+  s_eval_idx_match (st' with eval_mode := em') ∧
+  ARB
+Proof
+  cheat
+QED
+
 Triviality compile_correct_App:
   ^(#get_goal compile_correct_setup `Case [App _ _]`)
 Proof
+
   srw_tac [boolSimps.DNF_ss] [PULL_EXISTS]
   >- (
     (* empty array creation *)
@@ -3065,8 +3083,36 @@ Proof
     \\ fs [list_case_eq, option_case_eq]
     \\ rveq \\ fs []
     \\ imp_res_tac result_rel_imp \\ fs [result_rel_cases]
+    \\ fs [pair_case_eq, compile_exps_reverse]
     \\ rveq \\ fs []
+    \\ drule_then drule (Q.INST [`vs'` |-> `REVERSE rvs`] do_eval_thm)
+    \\ simp []
+    \\ disch_then drule
+    \\ rw []
+    \\ qpat_assum `invariant _ _ _ _` (mp_tac o REWRITE_RULE [invariant_def])
+    \\ rw [s_rel_cases] \\ fs [] \\ rveq \\ fs []
+    >- (
+      asm_exists_tac \\ fs []
+    )
+    \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
     \\ rveq \\ fs []
+    \\ drule_then assume_tac invariant_dec_clock
+    \\ last_x_assum (drule_then
+        (q_part_match_pat_tac `evaluate _ _ _ = _` mp_tac))
+    \\ impl_tac >- (
+      simp [dec_clock_def] \\ strip_tac \\ fs []
+    )
+    \\ reverse (strip_tac \\ fs []) \\ rveq \\ rfs []
+    \\ TRY (
+      goal_assum (first_assum o mp_then (Pat `invariant`) mp_tac)
+      \\ fsrw_tac [SATISFY_ss] [SUBMAP_TRANS, subglobals_trans]
+      \\ NO_TAC
+    )
+
+    (* something's up with the timeout errors *)
+    \\ fs [list_case_eq] \\ rveq \\ fs [] \\ rveq \\ fs []
+
+
     \\ drule_then drule v_to_environment
     \\ drule_then drule v_to_decs
     \\ rw []
@@ -3089,9 +3135,7 @@ Proof
       \\ simp [SUBSET_DEF, idx_final_block_def, idx_types_FORALL, FORALL_PROD]
       \\ fs [idx_prev_def]
     )
-    \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
-    \\ rveq \\ fs []
-    \\ drule_then assume_tac invariant_dec_clock
+
     \\ simp [glob_alloc_def, evaluate_def, do_app_def, Unitv_def]
     \\ simp [EVAL ``(dec_clock s).globals``]
     \\ drule invariant_begin_eval

@@ -622,7 +622,7 @@ Proof
   \\ rw[Once pmatch_nil]
 QED
 
-Triviality evaluate_decs_initial_state_clocks:
+Theorem evaluate_decs_initial_state_clocks:
   evaluate_decs (initial_state ffi k1 ec) decs = (s1, r1) ==>
   evaluate_decs (initial_state ffi k2 ec) decs = (s2, r2) ==>
   (k1 = k2 /\ s1 = s2 /\ r1 = r2
