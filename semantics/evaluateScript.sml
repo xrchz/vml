@@ -128,7 +128,7 @@ val _ = Define `
         | (st''', Rerr e) => (st''', Rerr e)
       )
     )
-      | (st'', Rval _) => (st'', Rerr (Rabort Rtimeout_error))
+      | (st'', Rval _) => (st'', Rerr (Rabort Rtype_error))
       | (st'', Rerr e) => (st'', Rerr e)
     )
   )
