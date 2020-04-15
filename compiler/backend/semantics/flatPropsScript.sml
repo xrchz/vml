@@ -412,6 +412,7 @@ Theorem evaluate_io_events_mono:
       s.ffi.io_events ≼ s'.ffi.io_events)
 Proof
   ho_match_mp_tac evaluate_ind \\ rw [evaluate_def]
+  \\ fs [pair_case_eq, option_case_eq, CaseEq "result", list_case_eq, bool_case_eq]
   \\ every_case_tac \\ fs [] \\ rfs []
   \\ rveq \\ fs []
   \\ fs [dec_clock_def]
@@ -486,10 +487,12 @@ Proof
   \\ rveq \\ fs []
   \\ fs [clock_io_mono_res_rel_def, dec_clock_def]
   \\ rpt TOP_CASE_TAC
+  \\ rfs [] \\ fs []
   \\ imp_res_tac evaluate_io_events_mono
   \\ imp_res_tac do_app_io_events_mono
   \\ imp_res_tac do_app_state_unchanged
   \\ rveq \\ fs []
+  \\ rfs [] \\ fs []
   \\ fsrw_tac [SATISFY_ss] [IS_PREFIX_TRANS]
 QED
 

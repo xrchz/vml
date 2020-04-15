@@ -1485,6 +1485,24 @@ Proof
   \\ simp []
 QED
 
+Triviality v_to_list_v_rel = MATCH_MP simple_v_to_list_v_rel simple_val_rel
+
+Theorem eval_res_thm:
+  eval_res r = SOME (xs, ys, rv) /\
+  v_rel r r' ==>
+  ?xs' ys' rv'. eval_res r' = SOME (xs', ys', rv') /\
+  LIST_REL v_rel xs xs' /\ LIST_REL v_rel ys ys' /\ v_rel rv rv' /\
+  (NULL xs = NULL xs')
+Proof
+  rw [eval_res_def, CaseEq "v", list_case_eq, option_case_eq]
+  \\ fs [v_rel_l_cases]
+  \\ rveq \\ fs []
+  \\ imp_res_tac v_to_list_v_rel
+  \\ fs []
+  \\ EQ_TAC \\ rw [] \\ imp_res_tac NULL_EQ
+  \\ fs []
+QED
+
 Theorem evaluate_decs_sing:
   evaluate_decs s [d] = evaluate_dec s d
 Proof
@@ -1677,16 +1695,17 @@ Proof
       \\ last_x_assum drule
       \\ rpt (disch_then drule)
       \\ simp [EVAL ``(dec_clock s).c``]
-      \\ impl_tac >- (strip_tac \\ fs [])
+      \\ impl_tac >- (strip_tac \\ fs [] \\ rveq \\ fs [])
       \\ rw []
-      \\ fs [result_case_eq] \\ rveq \\ fs []
+      \\ fs [result_case_eq, list_case_eq, option_case_eq, pair_case_eq]
+      \\ rveq \\ fs [] \\ rveq \\ fs []
+      \\ drule_then drule eval_res_thm
+      \\ rw [] \\ fs []
       \\ imp_res_tac state_rel_IMP_clock
       \\ fs [bool_case_eq]
-      \\ rveq \\ fs []
       \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
       \\ drule_then assume_tac state_rel_dec_clock
-      \\ fs []
-      \\ last_x_assum drule
+      \\ last_x_assum (drule_then drule)
       \\ simp [EVAL ``(dec_clock s).c``]
       \\ disch_then (qspec_then `cfg'` mp_tac)
       \\ impl_tac >- (strip_tac \\ fs [])

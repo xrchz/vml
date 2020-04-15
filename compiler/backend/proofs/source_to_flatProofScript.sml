@@ -3020,6 +3020,25 @@ Proof
   cheat
 QED
 
+Theorem eval_res_thm:
+  eval_res r = SOME (xs, ys, rv) /\
+  v_rel genv r r' /\
+  genv_c_ok genv.c
+  ==>
+  ?xs' ys' rv'. eval_res r' = SOME (xs', ys', rv') /\
+  LIST_REL (v_rel genv) xs xs' /\
+  LIST_REL (v_rel genv) ys ys' /\
+  v_rel genv rv rv' /\
+  NULL xs = NULL xs'
+Proof
+  simp [flatSemTheory.eval_res_def, semanticPrimitivesTheory.eval_res_def]
+  \\ Cases_on `r` \\ rw [list_case_eq, option_case_eq]
+  \\ fs [v_rel_eqns] \\ rveq \\ fs []
+  \\ imp_res_tac v_to_list
+  \\ fs []
+  \\ EQ_TAC \\ rw [] \\ imp_res_tac NULL_EQ \\ fs []
+QED
+
 Triviality compile_correct_App:
   ^(#get_goal compile_correct_setup `Case [App _ _]`)
 Proof
@@ -3108,9 +3127,19 @@ Proof
       \\ fsrw_tac [SATISFY_ss] [SUBMAP_TRANS, subglobals_trans]
       \\ NO_TAC
     )
+    \\ fs [list_case_eq] \\ fs [option_case_eq, pair_case_eq]
+    \\ rveq \\ fs []
+    \\ drule_then drule eval_res_thm
+    \\ (impl_tac >- fs [invariant_def])
+    \\ strip_tac \\ simp []
+    \\ fs [list_case_eq] \\ rveq \\ fs []
 
-    (* something's up with the timeout errors *)
-    \\ fs [list_case_eq] \\ rveq \\ fs [] \\ rveq \\ fs []
+(* hmm, the post-processing of the value from eval_res is different *)
+
+invariant_def
+
+
+    \\ fs [list_case_eq, option_case_eq, pair_case_eq] \\ rveq \\ fs []
 
 
     \\ drule_then drule v_to_environment

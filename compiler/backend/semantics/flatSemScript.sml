@@ -664,7 +664,7 @@ val is_fresh_exn_def = Define `
   is_fresh_exn exn_id ctors ⇔
     !ctor. ctor ∈ ctors ⇒ !arity. ctor ≠ ((exn_id, NONE), arity)`;
 
-val do_eval_def = Define `
+Definition do_eval_def:
   do_eval (vs :v list) ev_mode =
     case ev_mode of
     | flatSem$Eval ec =>
@@ -696,7 +696,17 @@ val do_eval_def = Define `
                else NONE
              | _ => NONE)
           | _ => NONE)
-       | _ => NONE)`;
+       | _ => NONE)
+End
+
+Definition eval_res_def:
+  eval_res v = case v of
+    | Conv NONE [words_v; bytes_v; res_v] => (case
+        (v_to_list words_v, v_to_list bytes_v) of
+      |  (SOME words, SOME bytes) => SOME (words, bytes, res_v)
+      | _ => NONE)
+    | _ => NONE
+End
 
 Definition evaluate_def:
   (evaluate (env:v flatSem$environment) ^s ([]:flatLang$exp list) =
@@ -757,20 +767,28 @@ Definition evaluate_def:
             | SOME (compiler_call, decs, eval_mode, retv) =>
               let s = s with eval_mode := eval_mode in
               let res = case compiler_call of
-                | NONE => (s, Rval [Unitv])
+                | NONE => (s, T, Rval Unitv)
                 | SOME (env', x) =>
                     if s.clock = 0 then
-                      (s, Rerr (Rabort Rtimeout_error))
+                      (s, F, Rerr (Rabort Rtimeout_error))
                     else
-                      fix_clock (dec_clock s) (evaluate env' (dec_clock s) [x])
+                      case fix_clock (dec_clock s)
+                          (evaluate env' (dec_clock s) [x]) of
+                        | (s, Rval [r]) => (case eval_res r of
+                            | SOME (ws, _, x) => (s, ~ NULL ws, Rval x)
+                            | NONE => (s, F, Rerr (Rabort Rtype_error))
+                          )
+                        | (s, Rerr err) => (s, F, Rerr err)
+                        | (s, _) => (s, F, Rerr (Rabort Rtype_error))
               in (case res of
-                | (s, Rval r) =>
+                | (s, T, Rval r) =>
                   if s.clock = 0 then
                     (s, Rerr (Rabort Rtimeout_error))
                   else (case evaluate_decs (dec_clock s) decs of
-                    | (s, NONE) => (s, Rval [retv])
+                    | (s, NONE) => (s, Rval [r])
                     | (s, SOME e) => (s, Rerr e))
-                | res => res)
+                | (s, F, Rval r) => (s, Rval [r])
+                | (s, _, Rerr err) => (s, Rerr err))
           | NONE => (s, Rerr (Rabort Rtype_error)))
        else
        (case (do_app s op (REVERSE vs)) of
@@ -836,13 +854,13 @@ Termination
         | (INR(INR(s,ds))) => (s.clock,SUM (MAP dec_size ds) + LENGTH ds + 1))`
   \\ simp [exp_size_def, dec_clock_def]
   \\ rw []
-  \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq, option_case_eq, bool_case_eq]
+  \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq, option_case_eq,
+        bool_case_eq, CaseEq "result", list_case_eq]
   \\ rw []
   \\ imp_res_tac fix_clock_IMP
   \\ imp_res_tac do_if_either_or
   \\ imp_res_tac pmatch_rows_Match_exp_size
-  \\ fs []
-  \\ simp [MAP_REVERSE, SUM_REVERSE, exp6_size]
+  \\ fs [MAP_REVERSE, SUM_REVERSE, exp6_size]
 End
 
 val op_thms = { nchotomy = op_nchotomy, case_def = op_case_def};
@@ -894,7 +912,10 @@ Theorem evaluate_clock:
    (∀^s e r s2. evaluate_decs s e = (s2,r) ⇒ s2.clock ≤ s.clock)
 Proof
   ho_match_mp_tac evaluate_ind >> rw[evaluate_def] >>
-  every_case_tac >> fs[dec_clock_def] >> rw[] >> rfs[] >>
+  fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq, option_case_eq,
+        bool_case_eq, CaseEq "result", list_case_eq] >>
+  every_case_tac >>
+  fs[dec_clock_def] >> rw[] >> rfs[] >>
   imp_res_tac fix_clock_IMP >> imp_res_tac do_app_const >> fs[]
 QED
 
