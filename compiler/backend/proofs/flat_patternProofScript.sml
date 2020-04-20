@@ -1678,6 +1678,7 @@ Proof
     )
     \\ Cases_on `op = Eval`
     >- (
+
       fs [option_case_eq]
       \\ fs [pair_case_eq]
       \\ rveq \\ fs []
@@ -1702,7 +1703,7 @@ Proof
       \\ drule_then drule eval_res_thm
       \\ rw [] \\ fs []
       \\ imp_res_tac state_rel_IMP_clock
-      \\ fs [bool_case_eq]
+      \\ fs [bool_case_eq, v_rel_rules]
       \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
       \\ drule_then assume_tac state_rel_dec_clock
       \\ last_x_assum (drule_then drule)
@@ -1711,6 +1712,7 @@ Proof
       \\ impl_tac >- (strip_tac \\ fs [])
       \\ rw []
       \\ fs [option_case_eq] \\ rveq \\ fs [OPTREL_def]
+      \\ simp [v_rel_rules]
     )
     \\ fs [option_case_eq, pair_case_eq]
     \\ rveq \\ fs []

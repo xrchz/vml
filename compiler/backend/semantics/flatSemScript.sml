@@ -785,9 +785,9 @@ Definition evaluate_def:
                   if s.clock = 0 then
                     (s, Rerr (Rabort Rtimeout_error))
                   else (case evaluate_decs (dec_clock s) decs of
-                    | (s, NONE) => (s, Rval [r])
+                    | (s, NONE) => (s, Rval [Conv NONE [retv; r]])
                     | (s, SOME e) => (s, Rerr e))
-                | (s, F, Rval r) => (s, Rval [r])
+                | (s, F, Rval r) => (s, Rval [Conv NONE [retv; r]])
                 | (s, _, Rerr err) => (s, Rerr err))
           | NONE => (s, Rerr (Rabort Rtype_error)))
        else
