@@ -1452,25 +1452,45 @@ Proof
   cheat
 QED
 
+Triviality v_to_list_v_rel = MATCH_MP simple_v_to_list_v_rel simple_val_rel
+
 Theorem do_eval_thm:
-  do_eval xs s.eval_mode = SOME (exec, decs, next_ec, rv) /\
+  do_eval xs s.eval_mode x = SOME (decs_opt, next_ec, rv) /\
   state_rel s t /\
+  OPTREL v_rel x y /\
   LIST_REL v_rel xs ys ==>
-  ?exec' rv' cfg' decs' next_ec' rv'.
-  do_eval ys t.eval_mode = SOME (exec', decs', next_ec', rv') /\
+  ?decs_opt' next_ec' rv'.
+  do_eval ys t.eval_mode y = SOME (decs_opt', next_ec', rv') /\
   v_rel rv rv' /\
   state_rel (s with eval_mode := next_ec) (t with eval_mode := next_ec') /\
-  decs' = MAP (compile_dec cfg') decs /\
-  (?env x env' x' i cfg sg. exec = SOME (env, x) /\ exec' = SOME (env', x') /\ 
-    compile_exp cfg x = (i, sg, x') /\
-    env_rel (i + 1) env env')
+  OPTREL (\decs decs'. ?cfg'. decs' = MAP (compile_dec cfg') decs)
+    decs_opt decs_opt'
+
+
 Proof
+
   rw [state_rel_def]
-  \\ fs [do_eval_def, case_eq_thms, pair_case_eq]
+  \\ fs [Q.SPECL [`vs`, `Eval _`] do_eval_def, case_eq_thms, pair_case_eq]
+  \\ rveq \\ fs []
+  \\ fs [OPTREL_SOME, v_rel_l_cases]
   \\ rveq \\ fs []
   \\ rpt (pairarg_tac \\ fs [])
-  \\ rveq \\ fs []
-  \\ drule do_opapp_thm
+  \\ drule_then drule v_to_environment_rel
+  \\ drule_then drule v_to_decs_rel
+  \\ rpt (dxrule_then drule v_to_list_v_rel)
+  \\ rw []
+  \\ simp [do_eval_def, extend_eval_config_def]
+  \\ fs [bool_case_eq] \\ imp_res_tac NULL_EQ \\ rveq \\ fs []
+  >- (
+    simp [OPTREL_def, v_rel_l_cases]
+    \\ metis_tac []
+  )
+  \\ drule_then drule (Q.prove (`LIST_REL P xs ys /\ ~ NULL xs ==> ~ NULL ys`,
+    rpt strip_tac \\ fs [NULL_EQ]))
+  \\ simp [v_rel_l_cases, OPTREL_SOME, environment_to_v_rel]
+  \\ metis_tac []
+
+(*
   \\ simp [PULL_EXISTS, v_rel_l_cases]
   \\ rpt (disch_then drule)
   \\ rw []
@@ -1483,24 +1503,29 @@ Proof
   \\ simp [environment_to_v_rel]
   \\ rpt (qexists_tac `st`)
   \\ simp []
+*)
 QED
 
-Triviality v_to_list_v_rel = MATCH_MP simple_v_to_list_v_rel simple_val_rel
-
-Theorem eval_res_thm:
-  eval_res r = SOME (xs, ys, rv) /\
-  v_rel r r' ==>
-  ?xs' ys' rv'. eval_res r' = SOME (xs', ys', rv') /\
-  LIST_REL v_rel xs xs' /\ LIST_REL v_rel ys ys' /\ v_rel rv rv' /\
-  (NULL xs = NULL xs')
+Theorem do_pre_eval_thm:
+  do_pre_eval xs s.eval_mode = SOME r /\
+  state_rel s t /\
+  LIST_REL v_rel xs ys ==>
+  ? env x env' x' i cfg sg. r = SOME (env, x) /\
+  do_pre_eval ys t.eval_mode = SOME (SOME (env', x')) /\
+    compile_exp cfg x = (i, sg, x') /\
+    env_rel (i + 1) env env'
 Proof
-  rw [eval_res_def, CaseEq "v", list_case_eq, option_case_eq]
-  \\ fs [v_rel_l_cases]
+  rw [do_pre_eval_def, state_rel_def, extend_eval_config_def]
+  \\ fs [CaseEq "v", list_case_eq, option_case_eq]
   \\ rveq \\ fs []
-  \\ imp_res_tac v_to_list_v_rel
-  \\ fs []
-  \\ EQ_TAC \\ rw [] \\ imp_res_tac NULL_EQ
-  \\ fs []
+  \\ rveq \\ fs []
+  \\ Cases_on `r'`
+  \\ drule do_opapp_thm
+  \\ simp [PULL_EXISTS, v_rel_l_cases]
+  \\ rpt (disch_then drule)
+  \\ rw []
+  \\ simp []
+  \\ metis_tac []
 QED
 
 Theorem evaluate_decs_sing:
@@ -1678,11 +1703,12 @@ Proof
     )
     \\ Cases_on `op = Eval`
     >- (
-
       fs [option_case_eq]
       \\ fs [pair_case_eq]
       \\ rveq \\ fs []
-      \\ drule (do_eval_thm |> Q.INST [`ys` |-> `REVERSE rys`])
+      \\ fs [Q.GEN `opt` option_case_eq |> Q.ISPEC `do_pre_eval _ _`]
+      \\ rveq \\ fs []
+      \\ drule (do_pre_eval_thm |> Q.INST [`ys` |-> `REVERSE rys`])
       \\ simp []
       \\ rpt (disch_then drule)
       \\ rpt strip_tac \\ fs []
@@ -1698,21 +1724,26 @@ Proof
       \\ simp [EVAL ``(dec_clock s).c``]
       \\ impl_tac >- (strip_tac \\ fs [] \\ rveq \\ fs [])
       \\ rw []
-      \\ fs [result_case_eq, list_case_eq, option_case_eq, pair_case_eq]
+      \\ fs [result_case_eq, list_case_eq, pair_case_eq]
       \\ rveq \\ fs [] \\ rveq \\ fs []
-      \\ drule_then drule eval_res_thm
+      \\ fs [option_case_eq]
+      \\ fs [pair_case_eq] \\ rveq \\ fs []
+      \\ rpt (disch_then drule)
+      \\ rw []
+      \\ drule_then drule (Q.INST [`ys` |-> `REVERSE rys`] do_eval_thm)
+      \\ simp [OPTREL_SOME, PULL_EXISTS]
+      \\ rpt (disch_then drule)
       \\ rw [] \\ fs []
       \\ imp_res_tac state_rel_IMP_clock
+      \\ fs [OPTREL_def] \\ fs [] \\ rveq \\ fs []
       \\ fs [bool_case_eq, v_rel_rules]
       \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
       \\ drule_then assume_tac state_rel_dec_clock
       \\ last_x_assum (drule_then drule)
       \\ simp [EVAL ``(dec_clock s).c``]
-      \\ disch_then (qspec_then `cfg'` mp_tac)
+      \\ disch_then (qspec_then `cfg''` mp_tac)
       \\ impl_tac >- (strip_tac \\ fs [])
-      \\ rw []
-      \\ fs [option_case_eq] \\ rveq \\ fs [OPTREL_def]
-      \\ simp [v_rel_rules]
+      \\ rw [] \\ fs [] \\ rveq \\ fs []
     )
     \\ fs [option_case_eq, pair_case_eq]
     \\ rveq \\ fs []

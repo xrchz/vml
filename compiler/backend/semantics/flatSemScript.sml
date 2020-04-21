@@ -664,19 +664,33 @@ val is_fresh_exn_def = Define `
   is_fresh_exn exn_id ctors ⇔
     !ctor. ctor ∈ ctors ⇒ !arity. ctor ≠ ((exn_id, NONE), arity)`;
 
+Definition do_pre_eval_def:
+  do_pre_eval (vs : v list) ec = case (ec, vs) of
+    | (Install _, _) => SOME NONE
+    | (Eval _, [compilerv; envv; dsv]) => (case
+        do_opapp [compilerv; Conv NONE [envv; dsv]] of
+      | SOME r => SOME (SOME r)
+      | NONE => NONE)
+    | _ => NONE
+End
+
 Definition do_eval_def:
-  do_eval (vs :v list) ev_mode =
+  do_eval (vs :v list) ev_mode compiler_r =
     case ev_mode of
     | flatSem$Eval ec =>
-      (case vs of
-       | [compilerv; envv; dsv] =>
-         (case (flatSem$do_opapp [compilerv; Conv NONE [envv; dsv]],
-                     v_to_environment envv, flatSem$v_to_decs dsv) of
-           (SOME (env1, x), SOME env2, SOME ds) =>
-             let (decs, new_env, new_st) = ec.compile env2 ec.compiler_state ds in
-               SOME (SOME (env1, x), decs,
+      (case (compiler_r, vs) of
+       | (SOME (Conv NONE [words_v; bytes_v; res_v]), [_; env_v; ds_v]) =>
+         (case (v_to_list words_v, v_to_list bytes_v,
+                     v_to_environment env_v, flatSem$v_to_decs ds_v) of
+           | (SOME words, SOME bytes, SOME env, SOME ds) =>
+             if NULL words
+             then SOME (NONE, ev_mode, Conv NONE [env_v; res_v])
+             else
+             let (decs, env', new_st) = ec.compile env ec.compiler_state ds in
+             let merge_env = source_to_flat$extend_env env' env in
+               SOME (SOME decs,
                      Eval (ec with compiler_state := new_st),
-                     environment_to_v (source_to_flat$extend_env new_env env2))
+                     Conv NONE [environment_to_v merge_env; res_v])
           | _ => NONE)
        | _ => NONE)
     | flatSem$Install ic =>
@@ -690,22 +704,13 @@ Definition do_eval_def:
              | SOME (bytes',data',st') =>
                if bytes = bytes' ∧ data = data' ∧
                   FST(new_oracle 0) = st' ∧ decs <> [] then
-                 SOME (NONE, decs,
+                 SOME (SOME decs,
                        Install (ic with compile_oracle := new_oracle),
                        Unitv)
                else NONE
              | _ => NONE)
           | _ => NONE)
        | _ => NONE)
-End
-
-Definition eval_res_def:
-  eval_res v = case v of
-    | Conv NONE [words_v; bytes_v; res_v] => (case
-        (v_to_list words_v, v_to_list bytes_v) of
-      |  (SOME words, SOME bytes) => SOME (words, bytes, res_v)
-      | _ => NONE)
-    | _ => NONE
 End
 
 Definition evaluate_def:
@@ -755,7 +760,7 @@ Definition evaluate_def:
    case fix_clock s (evaluate env s (REVERSE es)) of
    | (s, Rval vs) =>
        if op = flatLang$Opapp then
-         (case flatSem$do_opapp (REVERSE vs) of
+         (case do_opapp (REVERSE vs) of
           | SOME (env', e) =>
             if s.clock = 0 then
               (s, Rerr (Rabort Rtimeout_error))
@@ -763,33 +768,33 @@ Definition evaluate_def:
               evaluate env' (dec_clock s) [e]
           | NONE => (s, Rerr (Rabort Rtype_error)))
        else if op = flatLang$Eval then
-         (case flatSem$do_eval (REVERSE vs) s.eval_mode of
-            | SOME (compiler_call, decs, eval_mode, retv) =>
-              let s = s with eval_mode := eval_mode in
-              let res = case compiler_call of
-                | NONE => (s, T, Rval Unitv)
-                | SOME (env', x) =>
-                    if s.clock = 0 then
-                      (s, F, Rerr (Rabort Rtimeout_error))
-                    else
-                      case fix_clock (dec_clock s)
-                          (evaluate env' (dec_clock s) [x]) of
-                        | (s, Rval [r]) => (case eval_res r of
-                            | SOME (ws, _, x) => (s, ~ NULL ws, Rval x)
-                            | NONE => (s, F, Rerr (Rabort Rtype_error))
-                          )
-                        | (s, Rerr err) => (s, F, Rerr err)
-                        | (s, _) => (s, F, Rerr (Rabort Rtype_error))
-              in (case res of
-                | (s, T, Rval r) =>
-                  if s.clock = 0 then
-                    (s, Rerr (Rabort Rtimeout_error))
-                  else (case evaluate_decs (dec_clock s) decs of
-                    | (s, NONE) => (s, Rval [Conv NONE [retv; r]])
+         let res = (case do_pre_eval (REVERSE vs) s.eval_mode of
+           | NONE => (s, Rerr (Rabort Rtype_error))
+           | SOME NONE => (s, Rval NONE)
+           | SOME (SOME (env', x)) => 
+             if s.clock = 0 then
+               (s, Rerr (Rabort Rtimeout_error))
+             else
+               case fix_clock (dec_clock s) (evaluate env' (dec_clock s) [x]) of
+                 | (s, Rval [r]) => (s, Rval (SOME r))
+                 | (s, Rerr err) => (s, Rerr err)
+                 | (s, _) => (s, Rerr (Rabort Rtype_error))
+         ) in (case res of
+           | (s, Rval r) => (case do_eval (REVERSE vs) s.eval_mode r of
+             | NONE => (s, Rerr (Rabort Rtype_error))
+             | SOME (NONE, eval_mode, retv) =>
+               (s with eval_mode := eval_mode, Rval [retv])
+             | SOME (SOME decs, eval_mode, retv) =>
+               let s = s with eval_mode := eval_mode in
+               if s.clock = 0 then
+                 (s, Rerr (Rabort Rtimeout_error))
+               else
+                 (case evaluate_decs (dec_clock s) decs of
+                    | (s, NONE) => (s, Rval [retv])
                     | (s, SOME e) => (s, Rerr e))
-                | (s, F, Rval r) => (s, Rval [Conv NONE [retv; r]])
-                | (s, _, Rerr err) => (s, Rerr err))
-          | NONE => (s, Rerr (Rabort Rtype_error)))
+             )
+           | (s, Rerr e) => (s, Rerr e)
+           )
        else
        (case (do_app s op (REVERSE vs)) of
         | NONE => (s, Rerr (Rabort Rtype_error))

@@ -282,7 +282,9 @@ Proof
   ho_match_mp_tac (evaluate_ind |> Q.SPECL [`P`, `\_ _. T`, `\_ _. T`]
     |> SIMP_RULE bool_ss [] |> Q.GEN `P`) >>
   srw_tac[][evaluate_def, LET_DEF] >> srw_tac[][] >>
-  every_case_tac >> full_simp_tac(srw_ss())[] >> srw_tac[][]
+  fs [case_eq_thms, pair_case_eq, bool_case_eq, CaseEq"match_result",
+    Q.ISPEC `(a, b)` EQ_SYM_EQ] >>
+  rw [] >> fs []
 QED
 
 Theorem evaluate_cons:
