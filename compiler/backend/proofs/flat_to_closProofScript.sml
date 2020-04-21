@@ -1222,12 +1222,19 @@ Proof
   \\ simp [Once v_rel_cases]
 QED
 
+Theorem do_pre_eval:
+  state_rel s t ==> do_pre_eval vs s.eval_mode = SOME NONE
+Proof
+  Cases_on `s.eval_mode` \\ simp [state_rel_def, install_config_rel_def]
+  \\ simp [do_pre_eval_def]
+QED
+
 Theorem do_eval_install:
-  do_eval xs s.eval_mode = SOME res /\
+  do_eval xs s.eval_mode NONE = SOME res /\
   state_rel s t /\
   LIST_REL v_rel xs ys ==>
   ?decs exps em' t'. state_rel (s with eval_mode := em') t' /\
-  res = (NONE, decs, em', Unitv) /\
+  res = (SOME decs, em', Unitv) /\
   do_install (REVERSE ys) t = (if t'.clock = 0
     then (Rerr (Rabort Rtimeout_error), t')
     else (Rval (exps ++ compile [] [Con None NONE []]), dec_clock 1 t')) /\
@@ -1362,10 +1369,12 @@ Proof
     \\ fs [o_DEF])
   \\ Cases_on `op = Eval`
   THEN1 (
-
     simp [compile_op_def, evaluate_def]
     \\ fs [case_eq_thms]
     \\ fs [pair_case_eq] \\ rveq \\ fs []
+    \\ drule_then assume_tac do_pre_eval
+    \\ fs [] \\ rveq \\ fs []
+    \\ fs [case_eq_thms]
     \\ drule (do_eval_install |> Q.INST [`ys` |-> `REVERSE rys`])
     \\ simp []
     \\ rpt (disch_then drule)
@@ -1374,12 +1383,13 @@ Proof
     \\ `s2.clock = t2.clock /\ state_rel (dec_clock s2) (dec_clock 1 t2)`
         by (fs [markerTheory.Abbrev_def] \\ rveq \\ fs []
          \\ fs[flatSemTheory.dec_clock_def,dec_clock_def,state_rel_def])
+    \\ fs [markerTheory.Abbrev_def]
     \\ fs [SWAP_REVERSE_SYM] \\ rveq \\ fs []
     \\ fs [bool_case_eq] \\ rveq \\ fs []
     \\ fs [Q.ISPEC `(x, y)` EQ_SYM_EQ, pair_case_eq]
     \\ fs []
     \\ last_x_assum drule
-    \\ impl_tac >- (CCONTR_TAC \\ fs [])
+    \\ impl_tac >- (strip_tac \\ fs [])
     \\ rw []
     \\ fs [option_case_eq] \\ rveq \\ fs []
     \\ rveq \\ fs []
