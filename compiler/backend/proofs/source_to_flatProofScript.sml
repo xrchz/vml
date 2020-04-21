@@ -165,6 +165,10 @@ Definition genv_c_tys_ok_def:
       MEM (cn, arity) ctors
 End
 
+Definition represents_env_def:
+  represents_env genv env v <=> T
+End
+
 Inductive v_rel:
   (!genv lit.
     v_rel genv ((Litv lit):semanticPrimitives$v) ((Litv lit):flatSem$v)) ∧
@@ -230,6 +234,12 @@ Inductive v_rel:
     LIST_REL (v_rel genv) vs vs'
     ⇒
     v_rel genv (Vectorv vs) (Vectorv vs')) ∧
+  (*
+  (!genv e v.
+    represents_env genv e v
+    ⇒
+    v_rel genv (Env e) v) ∧
+  *)
   (!genv.
     env_rel genv nsEmpty []) ∧
   (!genv x v env env' v'.
@@ -1859,10 +1869,26 @@ QED
 
 Theorem invariant_dec_clock:
    invariant genv env st1 st2 ⇒
-   invariant genv env (dec_clock st1) (dec_clock st2)
+   st1.clock = st2.clock ∧ invariant genv env (dec_clock st1) (dec_clock st2)
 Proof
   simp [invariant_def, dec_clock_def, evaluateTheory.dec_clock_def]
   \\ simp [s_rel_cases]
+QED
+
+Theorem invariant_eval_mode:
+   invariant genv env st1 st2 ⇒
+   ? fin_idx. st2.eval_mode =
+   Eval <| compile := inc_compile; compiler_state := fin_idx |>
+Proof
+  simp [invariant_def, dec_clock_def, evaluateTheory.dec_clock_def]
+  \\ rw [s_rel_cases, idx_range_rel_def]
+  \\ simp []
+QED
+
+Triviality eval_mode_unchanged:
+  f s.eval_mode = s.eval_mode ==> s with eval_mode updated_by f = s
+Proof
+  simp [state_component_equality]
 QED
 
 Theorem v_rel_Bool_eqn:
@@ -2343,6 +2369,15 @@ Proof
   cheat
 QED
 
+Theorem v_to_environment_some:
+  v_to_environment v = SOME env ==> v = environment_to_v env
+Proof
+  rw [v_to_environment_def, some_def]
+  \\ simp []
+  (* yuck, needs injectivity *)
+  \\ cheat
+QED
+
 Theorem genv_c_ok_extend:
   genv_c_ok c ∧
   (! cn arity stamp. FLOOKUP c_ext (cn, arity) = SOME stamp ⇒
@@ -2408,6 +2443,23 @@ Proof
   \\ TRY (simp [FLOOKUP_FUNION] \\ NO_TAC)
   \\ drule_then (fn t => REWRITE_TAC [t]) FUNION_COMM
   \\ simp [FLOOKUP_FUNION]
+QED
+
+(* for a special case where the indexes are advanced but not used *)
+Theorem invariant_just_advance_compiler_state:
+  invariant genv idxs st st' ∧
+  st'.eval_mode = Eval e ∧ e2.compile = e.compile ∧
+  idx_prev e.compiler_state e2.compiler_state ⇒
+  invariant genv idxs st (st' with <| eval_mode := Eval e2 |>)
+Proof
+  rw [invariant_def]
+  \\ fs [idx_range_rel_def, s_rel_cases, idx_prev_def]
+  \\ simp [eval_compiler_config_component_equality]
+  \\ rveq \\ fs []
+  \\ drule_then irule ALL_DISJOINT_SUBSETS
+  \\ simp_tac list_ss [SUBSET_REFL]
+  \\ simp [idx_block_def, idx_final_block_def]
+  \\ simp [SUBSET_DEF, PULL_EXISTS]
 QED
 
 Theorem invariant_begin_eval:
@@ -2713,6 +2765,10 @@ Proof
   simp [invariant_def, s_rel_cases]
 QED
 
+Theorem eval_res_eq_some = ``eval_res r = SOME v``
+  |> SIMP_CONV (bool_ss ++ optionSimps.OPTION_ss)
+    [semanticPrimitivesTheory.eval_res_def, AllCaseEqs (), PULL_EXISTS]
+
 Definition Case_def:
   Case X <=> T
 End
@@ -3003,46 +3059,9 @@ Proof
   >- metis_tac[LENGTH_MAP]
 QED
 
-Theorem do_eval_thm:
-  do_eval vs = SOME (c_env,c_exp,e_env,e_decs) /\
-  invariant genv idxs st st' /\
-  LIST_REL (v_rel genv) vs vs' ==>
-  ? comp_map env_i1 locals t1 ts decs' em' env_v.
-  do_eval vs' st'.eval_mode = SOME (SOME (env_i1,
-    compile_exp t1 (comp_map with v := bind_locals ts locals comp_map.v) c_exp),
-    decs', em', env_v) /\
-  env_all_rel genv comp_map c_env env_i1 locals ∧
-  LENGTH ts = LENGTH locals ∧
-  invariant genv idxs st (st' with eval_mode := em') ∧
-  s_eval_idx_match (st' with eval_mode := em') ∧
-  ARB
-Proof
-  cheat
-QED
-
-Theorem eval_res_thm:
-  eval_res r = SOME (xs, ys, rv) /\
-  v_rel genv r r' /\
-  genv_c_ok genv.c
-  ==>
-  ?xs' ys' rv'. eval_res r' = SOME (xs', ys', rv') /\
-  LIST_REL (v_rel genv) xs xs' /\
-  LIST_REL (v_rel genv) ys ys' /\
-  v_rel genv rv rv' /\
-  NULL xs = NULL xs'
-Proof
-  simp [flatSemTheory.eval_res_def, semanticPrimitivesTheory.eval_res_def]
-  \\ Cases_on `r` \\ rw [list_case_eq, option_case_eq]
-  \\ fs [v_rel_eqns] \\ rveq \\ fs []
-  \\ imp_res_tac v_to_list
-  \\ fs []
-  \\ EQ_TAC \\ rw [] \\ imp_res_tac NULL_EQ \\ fs []
-QED
-
 Triviality compile_correct_App:
   ^(#get_goal compile_correct_setup `Case [App _ _]`)
 Proof
-
   srw_tac [boolSimps.DNF_ss] [PULL_EXISTS]
   >- (
     (* empty array creation *)
@@ -3096,101 +3115,107 @@ Proof
   \\ rw []
   \\ Cases_on `op = Eval`
   >- (
-
     fs []
     \\ simp [astOp_to_flatOp_def, evaluate_def]
-    \\ fs [list_case_eq, option_case_eq]
+    \\ fs [semanticPrimitivesTheory.do_eval_def]
+    \\ fs [list_case_eq, option_case_eq, pair_case_eq]
     \\ rveq \\ fs []
-    \\ imp_res_tac result_rel_imp \\ fs [result_rel_cases]
-    \\ fs [pair_case_eq, compile_exps_reverse]
+    \\ fs [SWAP_REVERSE_SYM]
     \\ rveq \\ fs []
-    \\ drule_then drule (Q.INST [`vs'` |-> `REVERSE rvs`] do_eval_thm)
-    \\ simp []
-    \\ disch_then drule
+    \\ fs [compile_exps_reverse, result_rel_eqns]
+    \\ rveq \\ fs []
+    \\ drule do_opapp
+    \\ simp [PULL_EXISTS, v_rel_eqns]
+    \\ rpt (disch_then drule)
     \\ rw []
-    \\ qpat_assum `invariant _ _ _ _` (mp_tac o REWRITE_RULE [invariant_def])
-    \\ rw [s_rel_cases] \\ fs [] \\ rveq \\ fs []
+    \\ drule_then strip_assume_tac invariant_dec_clock
+    \\ drule_then strip_assume_tac invariant_eval_mode
+    \\ fs [EVAL ``(dec_clock s).eval_mode``]
+    \\ fs [bool_case_eq] \\ rveq \\ fs []
     >- (
-      asm_exists_tac \\ fs []
+      simp [do_pre_eval_def, result_rel_eqns]
+      \\ asm_exists_tac \\ simp []
     )
     \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
-    \\ rveq \\ fs []
-    \\ drule_then assume_tac invariant_dec_clock
-    \\ last_x_assum (drule_then
-        (q_part_match_pat_tac `evaluate _ _ _ = _` mp_tac))
-    \\ impl_tac >- (
-      simp [dec_clock_def] \\ strip_tac \\ fs []
-    )
-    \\ reverse (strip_tac \\ fs []) \\ rveq \\ rfs []
+    \\ first_x_assum (drule_then (drule_then drule))
+    \\ disch_then (q_part_match_pat_tac `compile_exp _ _ _` mp_tac)
+    \\ impl_tac >- ( simp [dec_clock_def] \\ strip_tac \\ fs [] )
+    \\ rw []
+    \\ simp [do_pre_eval_def, PULL_EXISTS]
+    \\ reverse ( drule_then assume_tac result_rel_imp \\ fs [])
+    \\ fs [result_rel_eqns] \\ rveq \\ fs [result_rel_eqns]
     \\ TRY (
       goal_assum (first_assum o mp_then (Pat `invariant`) mp_tac)
       \\ fsrw_tac [SATISFY_ss] [SUBMAP_TRANS, subglobals_trans]
       \\ NO_TAC
     )
-    \\ fs [list_case_eq] \\ fs [option_case_eq, pair_case_eq]
+    (* dance around doing the case split on null compiler result too early *)
+    \\ fs [list_case_eq, pair_case_eq, result_case_eq]
     \\ rveq \\ fs []
-    \\ drule_then drule eval_res_thm
-    \\ (impl_tac >- fs [invariant_def])
-    \\ strip_tac \\ simp []
-    \\ fs [list_case_eq] \\ rveq \\ fs []
-
-(* hmm, the post-processing of the value from eval_res is different *)
-
-invariant_def
-
-
-    \\ fs [list_case_eq, option_case_eq, pair_case_eq] \\ rveq \\ fs []
-
-
+    \\ fs [option_case_eq, pair_case_eq, eval_res_eq_some]
+    \\ rveq \\ fs []
+    \\ fs [v_rel_eqns] \\ rveq \\ fs []
+    \\ imp_res_tac invariant_genv_c_ok
+    \\ drule_then strip_assume_tac invariant_eval_mode
+    \\ rpt (drule_then (drule_then dxrule) v_to_list)
     \\ drule_then drule v_to_environment
     \\ drule_then drule v_to_decs
     \\ rw []
-    \\ qpat_assum `invariant _ _ _ _` (mp_tac o REWRITE_RULE [invariant_def])
-    \\ rw [idx_range_rel_def]
-    \\ fs [compile_exps_reverse, do_eval_def, inc_compile_def]
+    \\ simp [do_eval_def]
+    \\ fs [list_case_eq] \\ rveq \\ fs []
+    >- (
+      (* compiler fails to produce executable code *)
+      simp [result_rel_eqns, v_rel_eqns, eval_mode_unchanged]
+      \\ goal_assum (first_assum o mp_then (Pat `invariant`) mp_tac)
+      \\ imp_res_tac v_to_environment_some
+      \\ fsrw_tac [SATISFY_ss] [SUBMAP_TRANS, subglobals_trans,
+            v_rel_environment_to_v, global_env_inv_weak]
+    )
+    \\ simp [inc_compile_def]
     \\ rpt (pairarg_tac \\ fs [])
-    \\ fs [s_rel_cases]
+    \\ rveq \\ fs []
+    \\ imp_res_tac compile_decs_idx_prev
     \\ fs [bool_case_eq] \\ rveq \\ fs []
     >- (
-      (* out of clock *)
-      goal_assum (q_part_match_pat_tac `invariant _ _` mp_tac)
-      \\ fs [invariant_def, s_rel_cases]
-      \\ rfs [idx_range_rel_def]
-      \\ imp_res_tac compile_decs_idx_prev
-      \\ drule_then drule idx_prev_trans
-      \\ rw []
-      \\ drule_then irule ALL_DISJOINT_SUBSETS
-      \\ simp_tac list_ss [SUBSET_REFL]
-      \\ simp [SUBSET_DEF, idx_final_block_def, idx_types_FORALL, FORALL_PROD]
-      \\ fs [idx_prev_def]
+      drule invariant_just_advance_compiler_state
+      \\ drule_then strip_assume_tac invariant_dec_clock
+      \\ fs []
+      \\ disch_then (q_part_match_pat_tac `_ with eval_mode :=  _` mp_tac)
+      \\ rw [result_rel_eqns]
+      \\ asm_exists_tac
+      \\ fsrw_tac [SATISFY_ss] [SUBMAP_TRANS, subglobals_trans]
     )
-
-    \\ simp [glob_alloc_def, evaluate_def, do_app_def, Unitv_def]
-    \\ simp [EVAL ``(dec_clock s).globals``]
-    \\ drule invariant_begin_eval
-    \\ fs [dec_clock_def]
-    \\ rename [`compile_decs [] 0 _ _ _ = (_, new_fin_idx, _, _)`]
-    \\ disch_then (qspecl_then [`new_fin_idx`, `new_fin_idx`] mp_tac)
-    \\ imp_res_tac compile_decs_idx_prev
+    \\ drule_then strip_assume_tac invariant_dec_clock
+    \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
+    \\ PairCases_on `idxs`
+    \\ drule (Q.INST [`new_fin_idx` |-> `new_end_idx`] invariant_begin_eval)
+    \\ simp [EVAL ``(dec_clock s).eval_mode``, EVAL ``(dec_clock s).globals``]
+    \\ disch_then drule
     \\ rw [idx_prev_refl]
+    \\ fs []
     \\ last_x_assum (drule_then drule)
-    \\ simp [idx_prev_refl]
     \\ impl_tac
     >- (
-      drule_then (fn t => simp [t]) global_env_inv_weak
-      \\ rpt strip_tac \\ fs []
-      \\ fs [eval_idx_match_len_def, idx_prev_def]
+      fs [eval_idx_match_len_def, idx_prev_def]
+      \\ drule_then (DEP_REWRITE_TAC o single) global_env_inv_weak
+      \\ fsrw_tac [SATISFY_ss] [global_env_inv_weak, subglobals_trans]
+      \\ strip_tac \\ fs []
     )
     \\ rw []
-    \\ simp []
+    \\ simp [glob_alloc_def, evaluate_def, do_app_def, Unitv_def]
+    \\ fs [dec_clock_def]
     \\ drule_then drule invariant_end_eval
-    \\ (impl_tac >- metis_tac [idx_prev_trans])
+    \\ (impl_tac >- (fs [invariant_def, idx_range_rel_def]
+      \\ fsrw_tac [SATISFY_ss] [idx_prev_trans]
+    ))
     \\ rw []
     \\ fs [result_case_eq] \\ rveq \\ fs []
+    \\ imp_res_tac result_rel_imp \\ fs [result_rel_cases]
     \\ goal_assum (first_assum o mp_then (Pat `invariant`) mp_tac)
-    \\ imp_res_tac result_rel_imp \\ fs [result_rel_eqns]
+    \\ simp [result_rel_eqns, v_rel_eqns]
     \\ metis_tac [subglobals_trans, SUBMAP_TRANS, v_rel_environment_to_v,
-          global_env_inv_append, global_env_inv_weak, subglobals_refl]
+          global_env_inv_append, global_env_inv_weak, subglobals_refl,
+          v_rel_weak]
   ) >>
   fs [bool_case_eq]
   >- (
@@ -3201,8 +3226,7 @@ invariant_def
     drule_then assume_tac EVERY2_REVERSE >>
     drule_then drule do_opapp >>
     rw [] >>
-    imp_res_tac invariant_def >>
-    fs [s_rel_cases] >>
+    drule_then strip_assume_tac invariant_dec_clock >>
     rw []
     >- (
       (* out of clock *)
@@ -3211,7 +3235,6 @@ invariant_def
       simp [result_rel_eqns]
     ) >>
     fs [Q.ISPEC `(a, b)` EQ_SYM_EQ] >>
-    drule_then assume_tac invariant_dec_clock >>
     first_x_assum (drule_then (drule_then drule)) >>
     simp [dec_clock_def] >>
     metis_tac [SUBMAP_TRANS, subglobals_trans, SUBSET_TRANS]
@@ -3896,6 +3919,9 @@ Proof
   \\ TRY (Cases_on`l`>>fs[evaluate_def,compile_exp_def])
 QED
 
+Theorem compile_decs_correct = compile_correct
+  |> CONJUNCTS |> List.last |> REWRITE_RULE [elim_Case]
+
 Definition eval_conf_def:
   eval_conf idx = Eval <| compile := inc_compile; compiler_state := idx |>
 End
@@ -3969,7 +3995,7 @@ Proof
   \\ imp_res_tac compile_decs_idx_prev
   \\ fs [pre_invariant_def]
   \\ rw []
-  \\ drule_then drule (List.last (CONJUNCTS compile_correct))
+  \\ drule_then drule compile_decs_correct
   \\ rpt (disch_then drule)
   \\ simp [idx_prev_refl]
   \\ impl_tac
