@@ -93,23 +93,25 @@ evaluate st env [App op es] =
       else if op = Eval then
         match do_eval (reverse vs) with
         | Nothing -> (st', Rerr (Rabort Rtype_error))
-        | Just (c_env, c_exp, e_env, e_decs) ->
+        | Just (c_env, c_exp, args) ->
             if st'.clock = 0 then
               (st', Rerr (Rabort Rtimeout_error))
             else
               match fix_clock (dec_clock st')
                   (evaluate (dec_clock st') c_env [c_exp]) with
               | (st'', Rval [r]) ->
-                  match eval_res r with
-                  | Nothing -> (st'', Rerr (Rabort Rtype_error))
-                  | Just ([], _, r) -> (st'', Rval [Conv Nothing [Env e_env; r]])
-                  | Just (_, _, r) -> if st''.clock = 0 then
-                      (st'', Rerr (Rabort Rtimeout_error))
-                    else
-                      match fix_clock (dec_clock st'')
-                          (evaluate_decs (dec_clock st'') e_env e_decs) with
-                      | (st''', Rval env') -> (st''', Rval [Conv Nothing
-                              [Env (extend_dec_env env' e_env); r]])
+                  match (check_eval st''.eval args r, st''.clock, args) with
+                  | (Nothing, _, _) -> (st'', Rerr (Rabort Rtype_error))
+                  | (Just (false, e_s), _, (_, env, _)) ->
+                      (<| st'' with eval = e_s |>, Rval [Env env])
+                  | (Just (_, e_s), 0, _) ->
+                      (<| st'' with eval = e_s |>, Rerr (Rabort Rtimeout_error))
+                  | (Just (_, e_s), _, (_, env, decs)) ->
+                      match fix_clock (dec_clock <| st'' with eval = e_s |>)
+                          (evaluate_decs (dec_clock <| st'' with eval = e_s |>)
+                                  env decs) with
+                      | (st''', Rval env') -> (st''', Rval
+                              [Env (extend_dec_env env' env)])
                       | (st''', Rerr e) -> (st''', Rerr e)
                       end
                   end

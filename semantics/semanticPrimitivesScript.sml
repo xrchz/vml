@@ -237,6 +237,23 @@ val _ = Define `
     NONE))`;
 
 
+(* arguments to a compiler. the state is represented by some value v *)
+val _ = type_abbrev( "compiler_args" , ``: v # v sem_env # dec list``);
+(* return results of a compiler. target-length words represented by nat *)
+val _ = type_abbrev( "compiler_res" , ``: v # v sem_env # word8 list # num list``);
+
+val _ = Hol_datatype `
+ eval_state =
+  <| compiler :  (compiler_args ->  compiler_res option)option
+   ; compiler_state : v |>`;
+
+
+(*val default_eval_state : eval_state*)
+val _ = Define `
+ (default_eval_state=  
+ (<| compiler := NONE ; compiler_state := (Conv NONE []) |>))`;
+
+
 val _ = Hol_datatype `
 (*  'ffi *) state =
   <| clock : num
@@ -244,6 +261,7 @@ val _ = Hol_datatype `
    ; ffi : 'ffi ffi_state
    ; next_type_stamp : num
    ; next_exn_stamp : num
+   ; eval : eval_state
    |>`;
 
 
@@ -1064,29 +1082,122 @@ val _ = Define `
   )))`;
 
 
-(* Make sense of the args of Eval *)
-(*val do_eval : list v -> maybe (sem_env v * exp * sem_env v * list dec)*)
+(* interpret args of Eval *)
+(*val do_eval : list v -> maybe (sem_env v * exp * compiler_args)*)
 val _ = Define `
  (do_eval vs=  
  ((case vs of
-    [compiler_v; env_v; decs_v] =>
+    [compiler_v; st_v; env_v; decs_v] =>
       (case (do_opapp [compiler_v; Conv NONE [env_v; decs_v]],
           v_to_env env_v, v_to_decs decs_v) of
-        (SOME (env1, x), SOME env2, SOME decs) => SOME (env1, x, env2, decs)
+        (SOME (env1, x), SOME env2, SOME decs) =>
+          SOME (env1, x, (st_v, env2, decs))
       | _ => NONE
       )
   | _ => NONE
   )))`;
 
 
-(* Make sense of the result of an Eval compiler call *)
-(*val eval_res : v -> maybe (list v * list v * v)*)
+(* compare first-order v values, ignoring timestamps of constructors *)
+(*val stamp_same_name : maybe stamp -> maybe stamp -> bool*)
 val _ = Define `
- (eval_res v=  
+ (stamp_same_name st1 st2=  ((case (st1, st2) of
+    (SOME (TypeStamp nm1 _), SOME (TypeStamp nm2 _)) => nm1 = nm2
+  | _ => F
+  )))`;
+
+
+(*val match_v : v -> v -> bool*)
+ val match_v_defn = Defn.Hol_multi_defns `
+
+(match_v (Litv l1) (Litv l2)=  (l1 = l2))
+/\
+(match_v (Conv cn1 vs1) (Conv cn2 vs2)=  
+ (if stamp_same_name cn1 cn2 /\ (LENGTH vs1 = LENGTH vs2) then
+    match_v_list vs1 vs2
+  else
+    F))
+/\
+(match_v (Vectorv vs1) (Vectorv vs2)=  
+ (if LENGTH vs1 = LENGTH vs2 then
+    match_v_list vs1 vs2
+  else
+    F))
+/\
+(match_v _ _=  F)
+/\
+(match_v_list [] []=  T)
+/\
+(match_v_list (v1::vs1) (v2::vs2)=  
+ (if match_v v1 v2
+  then match_v_list vs1 vs2
+  else F))
+/\
+(match_v_list _ _=  F)`;
+
+val _ = Lib.with_flag (computeLib.auto_import_definitions, false) (List.map Defn.save_defn) match_v_defn;
+
+(*val v_to_word8 : v -> maybe word8*)
+val _ = Define `
+ (v_to_word8 v=  ((case v of
+    Litv (Word8 w) => SOME w
+  | _ => NONE
+  )))`;
+
+
+(*val v_to_nat : v -> maybe nat*)
+val _ = Define `
+ (v_to_nat v=  ((case v of
+    Litv (Word8 w) => SOME (w2n w)
+  | Litv (Word64 w) => SOME (w2n w)
+  | _ => NONE
+  )))`;
+
+
+(*val maybe_all_list : forall 'a. list (maybe 'a) -> maybe (list 'a)*)
+ val maybe_all_list_defn = Hol_defn "maybe_all_list" `
+ (maybe_all_list v=  
  ((case v of
-    Conv NONE [words_v; bytes_v; res] =>
-      (case (v_to_list words_v, v_to_list bytes_v) of
-        (SOME words, SOME bytes) => SOME (words, bytes, res)
+    [] => SOME []
+  | (NONE :: _) => NONE
+  | (SOME x :: vs) => (case maybe_all_list vs of
+      SOME xs => SOME (x :: xs)
+    | NONE => NONE
+    )
+  )))`;
+
+val _ = Lib.with_flag (computeLib.auto_import_definitions, false) Defn.save_defn maybe_all_list_defn;
+
+(*val v_to_nat_list : v -> maybe (list nat)*)
+val _ = Define `
+ (v_to_nat_list v=  ((case v_to_list v of
+    SOME xs => maybe_all_list (MAP v_to_nat xs)
+  | NONE => NONE
+  )))`;
+
+
+(*val v_to_word8_list : v -> maybe (list word8)*)
+val _ = Define `
+ (v_to_word8_list v=  ((case v_to_list v of
+    SOME xs => maybe_all_list (MAP v_to_word8 xs)
+  | NONE => NONE
+  )))`;
+
+
+(* check a concrete Eval compiler call succeeded and matched the
+   abstract compiler, and update the abstract compiler state *)
+(*val check_eval : eval_state -> compiler_args -> v -> maybe (bool * eval_state)*)
+val _ = Define `
+ (check_eval es args v=  
+ ((case (es.compiler, v) of
+    (SOME f, Conv NONE [st_v; env_v; bytes_v; words_v]) =>
+      (case (f args, v_to_env env_v,
+                v_to_word8_list bytes_v, v_to_nat_list words_v)
+        of
+        (SOME (a_st, a_e, a_bs, a_ws), SOME e, SOME bs, SOME ws) =>
+          if match_v st_v a_st /\ (e = a_e) /\ (bs = a_bs) /\ (ws = a_ws)
+          then SOME (~ (ws = []), ( es with<| compiler_state := st_v |>))
+          else NONE
       | _ => NONE
       )
   | _ => NONE

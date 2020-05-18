@@ -110,23 +110,22 @@ val _ = Define `
       else if op = Eval then  
   (case do_eval (REVERSE vs) of
         NONE => (st', Rerr (Rabort Rtype_error))
-    | SOME (c_env, c_exp, e_env, e_decs) =>
+    | SOME (c_env, c_exp, args) =>
   if st'.clock = ( 0 : num) then (st', Rerr (Rabort Rtimeout_error)) else
     (case fix_clock (dec_clock st') (evaluate (dec_clock st') c_env [c_exp]) of
           (st'', Rval [r]) =>
-    (case eval_res r of
-          NONE => (st'', Rerr (Rabort Rtype_error))
-      | SOME ([], _, r) => (st'', Rval [Conv NONE [Env e_env; r]])
-      | SOME (_, _, r) =>
-    if st''.clock = ( 0 : num) then (st'', Rerr (Rabort Rtimeout_error)) else
-      (case fix_clock (dec_clock st'')
-              (evaluate_decs (dec_clock st'') e_env e_decs) of
-            (st''', Rval env') => (st''', Rval
-                                            [Conv NONE
-                                               [Env
-                                                  (extend_dec_env env' e_env); r]])
-        | (st''', Rerr e) => (st''', Rerr e)
-      )
+    (case (check_eval st''.eval args r, st''.clock, args) of
+          (NONE, _, _) => (st'', Rerr (Rabort Rtype_error))
+      | (SOME (F, e_s), _, (_, env, _)) =>
+    (( st'' with<| eval := e_s |>), Rval [Env env])
+      | (SOME (_, e_s), 0, _) =>
+    (( st'' with<| eval := e_s |>), Rerr (Rabort Rtimeout_error))
+      | (SOME (_, e_s), _, (_, env, decs)) =>
+    (case fix_clock (dec_clock ( st'' with<| eval := e_s |>))
+            (evaluate_decs (dec_clock ( st'' with<| eval := e_s |>)) env decs) of
+          (st''', Rval env') => (st''', Rval [Env (extend_dec_env env' env)])
+      | (st''', Rerr e) => (st''', Rerr e)
+    )
     )
       | (st'', Rval _) => (st'', Rerr (Rabort Rtype_error))
       | (st'', Rerr e) => (st'', Rerr e)

@@ -143,12 +143,26 @@ let store_assign n v st =
   else
     Nothing
 
+(* arguments to a compiler. the state is represented by some value v *)
+type compiler_args = v * sem_env v * list dec
+(* return results of a compiler. target-length words represented by nat *)
+type compiler_res = v * sem_env v * list word8 * list nat
+
+type eval_state =
+  <| compiler : maybe (compiler_args -> maybe compiler_res)
+   ; compiler_state : v |>
+
+val default_eval_state : eval_state
+let default_eval_state =
+  <| compiler = Nothing ; compiler_state = Conv Nothing [] |>
+
 type state 'ffi =
   <| clock : nat
    ; refs  : store v
    ; ffi : ffi_state 'ffi
    ; next_type_stamp : nat
    ; next_exn_stamp : nat
+   ; eval : eval_state
    |>
 
 (* Other primitives *)
@@ -868,26 +882,103 @@ let v_to_env v =
   | _ -> Nothing
   end
 
-(* Make sense of the args of Eval *)
-val do_eval : list v -> maybe (sem_env v * exp * sem_env v * list dec)
+(* interpret args of Eval *)
+val do_eval : list v -> maybe (sem_env v * exp * compiler_args)
 let do_eval vs =
   match vs with
-  | [compiler_v; env_v; decs_v] ->
+  | [compiler_v; st_v; env_v; decs_v] ->
       match (do_opapp [compiler_v; Conv Nothing [env_v; decs_v]],
           v_to_env env_v, v_to_decs decs_v) with
-      | (Just (env1, x), Just env2, Just decs) -> Just (env1, x, env2, decs)
+      | (Just (env1, x), Just env2, Just decs) ->
+          Just (env1, x, (st_v, env2, decs))
       | _ -> Nothing
       end
   | _ -> Nothing
   end
 
-(* Make sense of the result of an Eval compiler call *)
-val eval_res : v -> maybe (list v * list v * v)
-let eval_res v =
+(* compare first-order v values, ignoring timestamps of constructors *)
+val stamp_same_name : maybe stamp -> maybe stamp -> bool
+let stamp_same_name st1 st2 = match (st1, st2) with
+  | (Just (TypeStamp nm1 _), Just (TypeStamp nm2 _)) -> nm1 = nm2
+  | _ -> false
+  end
+
+val match_v : v -> v -> bool
+let rec
+match_v (Litv l1) (Litv l2) = (l1 = l2)
+and
+match_v (Conv cn1 vs1) (Conv cn2 vs2) =
+  if stamp_same_name cn1 cn2 && (List.length vs1 = List.length vs2) then
+    match_v_list vs1 vs2
+  else
+    false
+and
+match_v (Vectorv vs1) (Vectorv vs2) =
+  if List.length vs1 = List.length vs2 then
+    match_v_list vs1 vs2
+  else
+    false
+and
+match_v _ _ = false
+and
+match_v_list [] [] = true
+and
+match_v_list (v1::vs1) (v2::vs2) =
+  if match_v v1 v2
+  then match_v_list vs1 vs2
+  else false
+and
+match_v_list _ _ = false
+
+val v_to_word8 : v -> maybe word8
+let v_to_word8 v = match v with
+  | Litv (Word8 w) -> Just w
+  | _ -> Nothing
+  end
+
+val v_to_nat : v -> maybe nat
+let v_to_nat v = match v with
+  | Litv (Word8 w) -> Just (natFromWord8 w)
+  | Litv (Word64 w) -> Just (natFromWord64 w)
+  | _ -> Nothing
+  end
+
+val maybe_all_list : forall 'a. list (maybe 'a) -> maybe (list 'a)
+let rec maybe_all_list v =
   match v with
-  | Conv Nothing [words_v; bytes_v; res] ->
-      match (v_to_list words_v, v_to_list bytes_v) with
-      | (Just words, Just bytes) -> Just (words, bytes, res)
+  | [] -> Just []
+  | (Nothing :: _) -> Nothing
+  | (Just x :: vs) -> match maybe_all_list vs with
+    | Just xs -> Just (x :: xs)
+    | Nothing -> Nothing
+    end
+  end
+
+val v_to_nat_list : v -> maybe (list nat)
+let v_to_nat_list v = match v_to_list v with
+  | Just xs -> maybe_all_list (List.map v_to_nat xs)
+  | Nothing -> Nothing
+  end
+
+val v_to_word8_list : v -> maybe (list word8)
+let v_to_word8_list v = match v_to_list v with
+  | Just xs -> maybe_all_list (List.map v_to_word8 xs)
+  | Nothing -> Nothing
+  end
+
+(* check a concrete Eval compiler call succeeded and matched the
+   abstract compiler, and update the abstract compiler state *)
+val check_eval : eval_state -> compiler_args -> v -> maybe (bool * eval_state)
+let check_eval es args v =
+  match (es.compiler, v) with
+  | (Just f, Conv Nothing [st_v; env_v; bytes_v; words_v]) ->
+      match (f args, v_to_env env_v,
+                v_to_word8_list bytes_v, v_to_nat_list words_v)
+        with
+      | (Just (a_st, a_e, a_bs, a_ws), Just e, Just bs, Just ws) ->
+          if match_v st_v a_st && e = a_e && bs = a_bs && ws = a_ws
+          then Just (not (ws = []), <| es with compiler_state = st_v |>)
+          else Nothing
       | _ -> Nothing
       end
   | _ -> Nothing

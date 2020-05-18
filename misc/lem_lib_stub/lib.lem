@@ -226,7 +226,7 @@ declare isabelle target_rep function unknown_loc = `((| row = 0, col = 0, offset
 
 val option_map : forall 'a 'b. ('a -> 'b) -> maybe 'a -> maybe 'b
 declare hol      target_rep function option_map = `OPTION_MAP`
-declare isabelle target_rep function option_map = `???` (* TODO *)
+declare isabelle target_rep function option_map = `Option.map_option`
 
 val some : forall 'a. ('a -> bool) -> maybe 'a
 declare hol      target_rep function some = `$some`

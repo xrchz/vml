@@ -24,20 +24,20 @@ val _ = new_theory "lib"
 (*val map2 : forall 'a 'b 'c. ('a -> 'b -> 'c) -> list 'a -> list 'b -> list 'c*)
 
  val _ = Define `
- ((the:'a -> 'a option -> 'a) _ (SOME x)=  x) /\ ((the:'a -> 'a option -> 'a) x NONE=  x)`;
+ (the _ (SOME x)=  x) /\ (the x NONE=  x)`;
 
 
 (*val fapply : forall 'a 'b. MapKeyType 'b => 'a -> 'b -> Map.map 'b 'a -> 'a*)
 val _ = Define `
- ((fapply:'a -> 'b ->('b,'a)fmap -> 'a) d x f=  ((case FLOOKUP f x of SOME d => d | NONE => d )))`;
+ (fapply d x f=  ((case FLOOKUP f x of SOME d => d | NONE => d )))`;
 
 
  val lunion_defn = Defn.Hol_multi_defns `
 
-((lunion:'a list -> 'a list -> 'a list) [] s=  s)
+(lunion [] s=  s)
 /\
-((lunion:'a list -> 'a list -> 'a list) (x::xs) s=
-   (if MEM x s
+(lunion (x::xs) s=  
+ (if MEM x s
   then lunion xs s
   else x::(lunion xs s)))`;
 
@@ -115,8 +115,8 @@ val _ = type_abbrev((* ( 'a, 'b) *) "alist" , ``: ('a # 'b) list``);
 
 (*val opt_bind : forall 'a 'b. maybe 'a -> 'b -> alist 'a 'b -> alist 'a 'b*)
 val _ = Define `
- ((opt_bind:'a option -> 'b ->('a#'b)list ->('a#'b)list) n v e=
-   ((case n of
+ (opt_bind n v e=  
+ ((case n of
       NONE => e
     | SOME n' => (n',v)::e
   )))`;
@@ -126,8 +126,8 @@ val _ = Define `
 
  val _ = Define `
 
-((lshift:num ->(num)list ->(num)list) (n : num) ls=
-   (MAP (\ v .  v - n) (FILTER (\ v .  n <= v) ls)))`;
+(lshift (n : num) ls=  
+ (MAP (\ v .  v - n) (FILTER (\ v .  n <= v) ls)))`;
 
 
 (*open import {hol} `locationTheory`*)
@@ -135,7 +135,7 @@ val _ = Define `
 (*type locs = Locs of locn * locn*)
 (*val unknown_loc : locs*)
 
-(*val option_map : forall 'a 'b. ('a -> 'b) -> maybe 'a -> maybe 'b*) (* TODO *)
+(*val option_map : forall 'a 'b. ('a -> 'b) -> maybe 'a -> maybe 'b*)
 
 (*val some : forall 'a. ('a -> bool) -> maybe 'a*) (* TODO *)
 val _ = export_theory()
