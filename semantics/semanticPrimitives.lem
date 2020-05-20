@@ -46,8 +46,9 @@ type v =
   | Recclosure of sem_env v * list (varN * varN * exp) * varN
   | Loc of nat
   | Vectorv of list v
-  (* Environment value for Eval *)
-  | Env of (sem_env v)
+  (* Environment value for Eval, both semantic and the concrete representation
+     that is used by the compiler *)
+  | Env of sem_env v * v
 
 type env_ctor = namespace modN conN (nat * stamp)
 type env_val = namespace modN varN v
@@ -143,18 +144,36 @@ let store_assign n v st =
   else
     Nothing
 
-(* arguments to a compiler. the state is represented by some value v *)
-type compiler_args = v * sem_env v * list dec
-(* return results of a compiler. target-length words represented by nat *)
-type compiler_res = v * sem_env v * list word8 * list nat
+(* The abstract compiler, and its arguments and results. A compiler must be
+   provided for Eval to be used. The compiler would more conventionally be
+   given the type (env * state * decs) -> (env * state * code * data) however
+   the env type and state type are not known here, so they are encoded simply
+   as CakeML values. The environment component does not exactly correspond to
+   the semantic environments, it is more a state component that the user can
+   build and specify, whereas the compiler state being used must always be the
+   one most recently returned. *)
+type compiler_args =
+  <| a_env : v
+   ; a_state : v
+   ; decs : list dec |>
+type compiler_res =
+  <| r_env : v
+   ; r_state : v
+   ; code : list word8
+   ; data : list nat (* target-length words represented by naturals *)
+  |>
+type abstract_compiler = compiler_args -> maybe compiler_res
 
 type eval_state =
-  <| compiler : maybe (compiler_args -> maybe compiler_res)
-   ; compiler_state : v |>
+  <| compiler : maybe abstract_compiler
+   ; compiler_state : v
+   ; env_merge : v -> v -> v |>
 
 val default_eval_state : eval_state
 let default_eval_state =
-  <| compiler = Nothing ; compiler_state = Conv Nothing [] |>
+  <| compiler = Nothing
+   ; compiler_state = Conv Nothing []
+   ; env_merge = fun x -> (fun y -> y) |>
 
 type state 'ffi =
   <| clock : nat
@@ -357,7 +376,7 @@ do_eq (Recclosure _ _ _) (Closure _ _ _) = Eq_val true
 and
 do_eq (Recclosure _ _ _) (Recclosure _ _ _) = Eq_val true
 and
-do_eq (Env _) (Env _) = Eq_val true
+do_eq (Env _ _) (Env _ _) = Eq_val true
 and
 do_eq _ _ = Eq_type_error
 and
@@ -875,22 +894,22 @@ let decs_to_v ds = enc_list (List.map enc_dec ds)
 val v_to_decs : v -> maybe (list dec)
 let v_to_decs v = some (fun ds -> (v = decs_to_v ds))
 
-val v_to_env : v -> maybe (sem_env v)
+val v_to_env : v -> maybe (sem_env v * v)
 let v_to_env v =
   match v with
-  | Env env -> Just env
+  | Env env concrete_env -> Just (env, concrete_env)
   | _ -> Nothing
   end
 
-(* interpret args of Eval *)
-val do_eval : list v -> maybe (sem_env v * exp * compiler_args)
+(* Interpret args of Eval *)
+val do_eval : list v -> maybe ((sem_env v * exp) * sem_env v * compiler_args)
 let do_eval vs =
   match vs with
   | [compiler_v; st_v; env_v; decs_v] ->
-      match (do_opapp [compiler_v; Conv Nothing [env_v; decs_v]],
+      match (do_opapp [compiler_v; Conv Nothing [st_v; env_v; decs_v]],
           v_to_env env_v, v_to_decs decs_v) with
-      | (Just (env1, x), Just env2, Just decs) ->
-          Just (env1, x, (st_v, env2, decs))
+      | (Just (env1, x), Just (env2, arg_env), Just decs) ->
+          Just ((env1, x), env2, <| a_env = arg_env; a_state = st_v; decs = decs |>)
       | _ -> Nothing
       end
   | _ -> Nothing
@@ -967,17 +986,17 @@ let v_to_word8_list v = match v_to_list v with
   end
 
 (* check a concrete Eval compiler call succeeded and matched the
-   abstract compiler, and update the abstract compiler state *)
-val check_eval : eval_state -> compiler_args -> v -> maybe (bool * eval_state)
+   abstract compiler, and update the abstract compiler state and env *)
+val check_eval : eval_state -> compiler_args -> v -> maybe (bool * v * eval_state)
 let check_eval es args v =
   match (es.compiler, v) with
-  | (Just f, Conv Nothing [st_v; env_v; bytes_v; words_v]) ->
-      match (f args, v_to_env env_v,
-                v_to_word8_list bytes_v, v_to_nat_list words_v)
+  | (Just f, Conv Nothing [env_v; st_v; bytes_v; words_v]) ->
+      match (f args, v_to_word8_list bytes_v, v_to_nat_list words_v)
         with
-      | (Just (a_st, a_e, a_bs, a_ws), Just e, Just bs, Just ws) ->
-          if match_v st_v a_st && e = a_e && bs = a_bs && ws = a_ws
-          then Just (not (ws = []), <| es with compiler_state = st_v |>)
+      | (Just x, Just bs, Just ws) ->
+          if match_v env_v x.r_env && match_v st_v x.r_state && bs = x.code && ws = x.data
+          then Just (not (bs = []), es.env_merge env_v args.a_env,
+              <| es with compiler_state = st_v |>)
           else Nothing
       | _ -> Nothing
       end
@@ -1389,7 +1408,7 @@ let do_app ((s:store v),(t:ffi_state 'ffi)) op vs =
             end
         | _ -> Nothing
         end
-    | (EnvLookup, [Env env; id]) ->
+    | (EnvLookup, [Env env _; id]) ->
         match v_to_id id with
         | Nothing -> Nothing
         | Just n -> Just ((s, t), Rval (maybe_to_v (nsLookup env.v n)))

@@ -110,20 +110,23 @@ val _ = Define `
       else if op = Eval then  
   (case do_eval (REVERSE vs) of
         NONE => (st', Rerr (Rabort Rtype_error))
-    | SOME (c_env, c_exp, args) =>
+    | SOME ((c_env, c_exp), env, args) =>
   if st'.clock = ( 0 : num) then (st', Rerr (Rabort Rtimeout_error)) else
     (case fix_clock (dec_clock st') (evaluate (dec_clock st') c_env [c_exp]) of
           (st'', Rval [r]) =>
-    (case (check_eval st''.eval args r, st''.clock, args) of
-          (NONE, _, _) => (st'', Rerr (Rabort Rtype_error))
-      | (SOME (F, e_s), _, (_, env, _)) =>
-    (( st'' with<| eval := e_s |>), Rval [Env env])
-      | (SOME (_, e_s), 0, _) =>
+    (case (check_eval st''.eval args r, st''.clock) of
+          (NONE, _) => (st'', Rerr (Rabort Rtype_error))
+      | (SOME (F, res_env, e_s), _) =>
+    (( st'' with<| eval := e_s |>), Rval [Env env res_env])
+      | (SOME (_, _, e_s), 0) =>
     (( st'' with<| eval := e_s |>), Rerr (Rabort Rtimeout_error))
-      | (SOME (_, e_s), _, (_, env, decs)) =>
+      | (SOME (_, res_env, e_s), _) =>
     (case fix_clock (dec_clock ( st'' with<| eval := e_s |>))
-            (evaluate_decs (dec_clock ( st'' with<| eval := e_s |>)) env decs) of
-          (st''', Rval env') => (st''', Rval [Env (extend_dec_env env' env)])
+            (evaluate_decs (dec_clock ( st'' with<| eval := e_s |>)) 
+             env args.decs) of
+          (st''', Rval env') => (st''', Rval
+                                          [Env (extend_dec_env env' env)
+                                             res_env])
       | (st''', Rerr e) => (st''', Rerr e)
     )
     )
@@ -242,7 +245,9 @@ val _ = Define `
   (st, Rval <| v := nsEmpty; c := nsEmpty |>))
 /\
 (evaluate_decs st env [Denv n]= 
-  (st, Rval <| v := (nsBind n (Env env) nsEmpty); c := nsEmpty |>))
+  (* FIXME: this is where concrete environment objects appear, and is currently
+     left unimplemented. there is some thinking to be done about it *)
+  (st, Rval <| v := (nsBind n (Env env (Conv NONE [])) nsEmpty); c := nsEmpty |>))
 /\
 (evaluate_decs st env [Dexn locs cn ts]= 
   (( st with<| next_exn_stamp := (st.next_exn_stamp +( 1 : num)) |>),

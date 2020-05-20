@@ -93,25 +93,25 @@ evaluate st env [App op es] =
       else if op = Eval then
         match do_eval (reverse vs) with
         | Nothing -> (st', Rerr (Rabort Rtype_error))
-        | Just (c_env, c_exp, args) ->
+        | Just ((c_env, c_exp), env, args) ->
             if st'.clock = 0 then
               (st', Rerr (Rabort Rtimeout_error))
             else
               match fix_clock (dec_clock st')
                   (evaluate (dec_clock st') c_env [c_exp]) with
               | (st'', Rval [r]) ->
-                  match (check_eval st''.eval args r, st''.clock, args) with
-                  | (Nothing, _, _) -> (st'', Rerr (Rabort Rtype_error))
-                  | (Just (false, e_s), _, (_, env, _)) ->
-                      (<| st'' with eval = e_s |>, Rval [Env env])
-                  | (Just (_, e_s), 0, _) ->
+                  match (check_eval st''.eval args r, st''.clock) with
+                  | (Nothing, _) -> (st'', Rerr (Rabort Rtype_error))
+                  | (Just (false, res_env, e_s), _) ->
+                      (<| st'' with eval = e_s |>, Rval [Env env res_env])
+                  | (Just (_, _, e_s), 0) ->
                       (<| st'' with eval = e_s |>, Rerr (Rabort Rtimeout_error))
-                  | (Just (_, e_s), _, (_, env, decs)) ->
+                  | (Just (_, res_env, e_s), _) ->
                       match fix_clock (dec_clock <| st'' with eval = e_s |>)
                           (evaluate_decs (dec_clock <| st'' with eval = e_s |>)
-                                  env decs) with
+                                  env args.decs) with
                       | (st''', Rval env') -> (st''', Rval
-                              [Env (extend_dec_env env' env)])
+                              [Env (extend_dec_env env' env) res_env])
                       | (st''', Rerr e) -> (st''', Rerr e)
                       end
                   end
@@ -231,7 +231,9 @@ evaluate_decs st env [Dtabbrev locs tvs tn t] =
   (st, Rval <| v = nsEmpty; c = nsEmpty |>)
 and
 evaluate_decs st env [Denv n] =
-  (st, Rval <| v = nsBind n (Env env) nsEmpty; c = nsEmpty |>)
+  (* FIXME: this is where concrete environment objects appear, and is currently
+     left unimplemented. there is some thinking to be done about it *)
+  (st, Rval <| v = nsBind n (Env env (Conv Nothing [])) nsEmpty; c = nsEmpty |>)
 and
 evaluate_decs st env [Dexn locs cn ts] =
   (<| st with next_exn_stamp = st.next_exn_stamp + 1 |>,
