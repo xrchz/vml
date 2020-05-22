@@ -259,6 +259,8 @@ val fix_clock_IMP = Q.prove(
   `fix_clock s x = (s1,res) ==> s1.clock <= s.clock`,
   Cases_on `x` \\ fs [fix_clock_def] \\ rw [] \\ fs []);
 
+val evaluate_checks = CONJ check_after_eval1_def check_after_eval2_def
+
 val (evaluate_def, evaluate_ind) =
   tprove_no_defn ((evaluateTheory.evaluate_def,evaluateTheory.evaluate_ind),
   WF_REL_TAC`inv_image ($< LEX $<)
@@ -267,10 +269,12 @@ val (evaluate_def, evaluate_ind) =
          | INR(INL (s,_,_,pes,_)) => (s.clock,pes_size pes)
          | INR(INR (s,_,ds)) => (s.clock,dec1_size ds))` >>
   rw[size_abbrevs,exp_size_def,dec_clock_def,LESS_OR_EQ,
-     do_if_def,do_log_def] >>
+     do_if_def,do_log_def,evaluate_checks] >>
   imp_res_tac fix_clock_IMP >>
   simp[SIMP_RULE(srw_ss())[]exps_size_thm,MAP_REVERSE,SUM_REVERSE] >>
-  fs [pairTheory.LEX_DEF_THM]);
+  fs [pairTheory.LEX_DEF_THM] >>
+  fs [option_case_eq, pair_case_eq, result_case_eq, bool_case_eq] >>
+  rveq >> fs []);
 
 (* tidy up evalute_def and evaluate_ind *)
 
@@ -279,7 +283,9 @@ Theorem evaluate_clock:
    (∀(s1:'ffi state) env v p v' r s2. evaluate_match s1 env v p v' = (s2,r) ⇒ s2.clock ≤ s1.clock) ∧
    (∀(s1:'ffi state) env ds r s2. evaluate_decs s1 env ds = (s2,r) ⇒ s2.clock ≤ s1.clock)
 Proof
-  ho_match_mp_tac evaluate_ind >> rw[evaluate_def] >>
+  ho_match_mp_tac evaluate_ind >> rw[evaluate_def,evaluate_checks] >>
+  fs [option_case_eq, pair_case_eq, result_case_eq, bool_case_eq, list_case_eq] >>
+  rw [] >> fs [Q.ISPEC `(a, b)` EQ_SYM_EQ] >>
   every_case_tac >> fs[] >> rw[] >> rfs[] >>
   fs[dec_clock_def,fix_clock_def] >> simp[] >>
   imp_res_tac fix_clock_IMP >> fs[]

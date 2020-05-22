@@ -90,6 +90,16 @@ Proof
   >- fs[]
 QED
 
+Theorem check_after_eval_clock_ffi:
+  check_after_eval2 args r st = (st', res) ==>
+  st'.ffi = st.ffi /\ st'.clock <= st.clock
+Proof
+  simp [check_after_eval2_def, check_after_eval1_def]
+  \\ every_case_tac
+  \\ rw [dec_clock_def]
+  \\ rw []
+QED
+
 Theorem evaluate_call_FFI_rel:
    (∀(s:'ffi state) e exp.
       RTC call_FFI_rel s.ffi (FST (evaluate s e exp)).ffi) ∧
@@ -101,15 +111,10 @@ Proof
   ho_match_mp_tac terminationTheory.full_evaluate_ind >>
   srw_tac[][terminationTheory.full_evaluate_def] >>
   every_case_tac >> full_simp_tac(srw_ss())[] >>
-  TRY (
-    rename1`op ≠ Opapp` >>
-    imp_res_tac do_app_call_FFI_rel >>
-    metis_tac[RTC_TRANSITIVE,transitive_def] ) >>
-  TRY (
-    rename1`op = Opapp` >>
-    rev_full_simp_tac(srw_ss())[dec_clock_def] >>
-    metis_tac[RTC_TRANSITIVE,transitive_def] ) >>
-  rfs [] >> fs [dec_clock_def] >>
+  rfs [dec_clock_def] >>
+  imp_res_tac do_app_call_FFI_rel >>
+  imp_res_tac check_after_eval_clock_ffi >>
+  fsrw_tac[SATISFY_ss][REWRITE_RULE [transitive_def] RTC_TRANSITIVE] >>
   metis_tac[RTC_TRANSITIVE,transitive_def,FST]
 QED
 
@@ -316,11 +321,17 @@ Theorem is_clock_io_mono_match_case_safe = is_clock_io_mono_acc_safe
     | Match_type_error => h st | Match env => j env st`
   |> SIMP_RULE bool_ss []
 
-Theorem is_clock_io_mono_check_eval = is_clock_io_mono_acc_safe
-  |> Q.ISPEC `check_eval xa xb xc` |> Q.GEN `f`
-  |> Q.SPEC `\st. check_eval st.eval args v`
-  |> Q.SPEC `\c st. case c of NONE => g st | SOME v => h v st`
-  |> SIMP_RULE bool_ss []
+Theorem is_clock_io_mono_check_after_eval:
+  is_clock_io_mono (λst''. check_after_eval2 r'' h st'') st''
+Proof
+  simp [check_after_eval2_def]
+  \\ ho_match_mp_tac is_clock_io_mono_bind
+  \\ rw []
+  \\ every_case_tac
+  \\ simp [is_clock_io_mono_def, check_after_eval1_def, dec_clock_def]
+  \\ every_case_tac
+  \\ rw []
+QED
 
 Theorem is_clock_io_mono_evaluate:
    (!(s : 'ffi state) env es. is_clock_io_mono (\s. evaluate s env es) s) /\
@@ -335,11 +346,10 @@ Proof
             [is_clock_io_mono_bind, is_clock_io_mono_check_clock,
                 is_clock_io_mono_check_clock_eval]
         @ [CHANGED_TAC (fs [is_clock_io_mono_return, is_clock_io_mono_err,
-                is_clock_io_mono_do_app])]
+                is_clock_io_mono_do_app, is_clock_io_mono_check_after_eval])]
         @ [TOP_CASE_TAC]
         @ map (CHANGED_TAC o ho_match_mp_tac o GEN_ALL)
-                [is_clock_io_mono_if_safe, is_clock_io_mono_match_case_safe,
-                is_clock_io_mono_check_eval, is_clock_io_mono_check_eval]))
+                [is_clock_io_mono_if_safe, is_clock_io_mono_match_case_safe]))
   \\ fs [is_clock_io_mono_def, build_tdefs_def]
 QED
 
@@ -753,7 +763,7 @@ Proof
   \\ rpt strip_tac \\ fs [full_evaluate_def,combine_dec_result_def]
   \\ fs [pair_case_eq, CaseEq "result", CaseEq "error_result", bool_case_eq,
         option_case_eq, list_case_eq, CaseEq "exp_or_val",
-        num_case_eq]
+        num_case_eq, check_after_eval1_def, check_after_eval2_def]
   \\ full_simp_tac bool_ss [CaseEq "match_result"]
   \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ] \\ rveq \\ fs []
   \\ imp_res_tac evaluate_io_events_mono_imp
@@ -997,10 +1007,12 @@ Proof
   \\ rw[terminationTheory.full_evaluate_def]
   \\ fs [error_result_case_eq,option_case_eq,
          exp_or_val_case_eq,list_case_eq,match_result_case_eq,
-         pair_case_eq,result_case_eq,bool_case_eq,num_case_eq]
+         pair_case_eq,result_case_eq,bool_case_eq,num_case_eq,
+         check_after_eval1_def, check_after_eval2_def]
   \\ rveq \\ fs []
   \\ simp [rich_listTheory.DROP_LENGTH_NIL_rwt]
   \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, dec_clock_def]
+  \\ rveq \\ fs []
   \\ TRY (drule_then (fn t => simp [t])
        semanticPrimitivesPropsTheory.do_app_NONE_ffi)
   \\ TRY (drule_then (fn t => simp [t])
