@@ -41,6 +41,23 @@ val _ = Define `
 (list_result (Rerr e)=  (Rerr e))`;
 
 
+val _ = Define `
+ (check_after_eval1 args r st=  ((case check_eval st.eval args r of
+    NONE => (st, Rerr (Rabort Rtype_error))
+  | SOME (b, e_s) => (( st with<| eval := e_s; next_env_stamp := (st.next_env_stamp +( 1 : num)) |>),
+      Rval (b, st.next_env_stamp))
+  )))`;
+
+
+val _ = Define `
+ (check_after_eval2 args r st=  ((case check_after_eval1 args r st of
+    (st', Rval (T, env_id)) => if st'.clock =( 0 : num)
+    then (st', Rerr (Rabort Rtimeout_error))
+    else (dec_clock st', Rval (T, env_id))
+  | v => v
+  )))`;
+
+
 (*val evaluate : forall 'ffi. state 'ffi -> sem_env v -> list exp -> state 'ffi * result (list v) v*)
 (*val evaluate_match : forall 'ffi. state 'ffi -> sem_env v -> v -> list (pat * exp) -> v -> state 'ffi * result (list v) v*)
 (*val evaluate_decs : forall 'ffi. state 'ffi -> sem_env v -> list dec -> state 'ffi * result (sem_env v) v*)
@@ -114,19 +131,13 @@ val _ = Define `
   if st'.clock = ( 0 : num) then (st', Rerr (Rabort Rtimeout_error)) else
     (case fix_clock (dec_clock st') (evaluate (dec_clock st') c_env [c_exp]) of
           (st'', Rval [r]) =>
-    (case (check_eval st''.eval args r, st''.clock) of
-          (NONE, _) => (st'', Rerr (Rabort Rtype_error))
-      | (SOME (F, res_env, e_s), _) =>
-    (( st'' with<| eval := e_s |>), Rval [Env env res_env])
-      | (SOME (_, _, e_s), 0) =>
-    (( st'' with<| eval := e_s |>), Rerr (Rabort Rtimeout_error))
-      | (SOME (_, res_env, e_s), _) =>
-    (case fix_clock (dec_clock ( st'' with<| eval := e_s |>))
-            (evaluate_decs (dec_clock ( st'' with<| eval := e_s |>)) 
-             env args.decs) of
-          (st''', Rval env') => (st''', Rval
-                                          [Env (extend_dec_env env' env)
-                                             res_env])
+    (case check_after_eval2 args r st'' of
+          (st''', Rerr e) => (st''', Rerr e)
+      | (st''', Rval (F, env_id)) => (st''', Rval [Env env env_id])
+      | (st''', Rval (T, env_id)) =>
+    (case fix_clock st''' (evaluate_decs st''' env args.decs) of
+          (st'''', Rval env') => (st'''',
+                                 Rval [Env (extend_dec_env env' env) env_id])
       | (st''', Rerr e) => (st''', Rerr e)
     )
     )
@@ -245,9 +256,8 @@ val _ = Define `
   (st, Rval <| v := nsEmpty; c := nsEmpty |>))
 /\
 (evaluate_decs st env [Denv n]= 
-  (* FIXME: this is where concrete environment objects appear, and is currently
-     left unimplemented. there is some thinking to be done about it *)
-  (st, Rval <| v := (nsBind n (Env env (Conv NONE [])) nsEmpty); c := nsEmpty |>))
+  (( st with<| next_env_stamp := (st.next_env_stamp +( 1 : num)) |>),
+   Rval <| v := (nsBind n (Env env st.next_env_stamp) nsEmpty); c := nsEmpty |>))
 /\
 (evaluate_decs st env [Dexn locs cn ts]= 
   (( st with<| next_exn_stamp := (st.next_exn_stamp +( 1 : num)) |>),

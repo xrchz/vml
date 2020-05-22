@@ -48,7 +48,7 @@ val _ = Define `
  (prim_sem_env ffi=  
  (add_to_sem_env
     (<| clock :=(( 0 : num)); ffi := ffi; refs := ([]); next_type_stamp :=(( 0 : num));
-        next_exn_stamp :=(( 0 : num)); eval := default_eval_state |>,
+        next_exn_stamp :=(( 0 : num)); next_env_stamp :=(( 0 : num)); eval := default_eval_state |>,
      <| v := nsEmpty; c := nsEmpty |>)
         prim_types_program))`;
 

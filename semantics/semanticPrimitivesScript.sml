@@ -61,9 +61,9 @@ val _ = Hol_datatype `
   | Recclosure of v sem_env => (varN # varN # exp) list => varN
   | Loc of num
   | Vectorv of v list
-  (* Environment value for Eval, both semantic and the concrete representation
-     that is used by the compiler *)
-  | Env of v sem_env => v`;
+  (* Environment value for Eval. includes a semantic environment and also
+     a numeric identifier used by the compiler *)
+  | Env of v sem_env => num`;
 
 
 val _ = type_abbrev( "env_ctor" , ``: (modN, conN, (num # stamp)) namespace``);
@@ -241,21 +241,20 @@ val _ = Define `
 (* The abstract compiler, and its arguments and results. A compiler must be
    provided for Eval to be used. The compiler would more conventionally be
    given the type (env * state * decs) -> (env * state * code * data) however
-   the env type and state type are not known here, so they are encoded simply
-   as CakeML values. The environment component does not exactly correspond to
-   the semantic environments, it is more a state component that the user can
-   build and specify, whereas the compiler state being used must always be the
-   one most recently returned. *)
+   the state type is not known here, and is encoded simply as a CakeML value.
+   To simplify things, the compiler keeps the actual representation of envs in
+   a lookup table in the state, and thus envs can be represented by a numeric
+   identifier. The identity of the new env returned also doesn't need to be
+   specified, it will always be the newest one. *)
 val _ = Hol_datatype `
  compiler_args =
-  <| a_env : v
+  <| env : num
    ; a_state : v
    ; decs : dec list |>`;
 
 val _ = Hol_datatype `
  compiler_res =
-  <| r_env : v
-   ; r_state : v
+  <| r_state : v
    ; code : word8 list
    ; data : num list (* target-length words represented by naturals *)
   |>`;
@@ -265,16 +264,14 @@ val _ = type_abbrev( "abstract_compiler" , ``: compiler_args ->  compiler_res op
 val _ = Hol_datatype `
  eval_state =
   <| compiler :  abstract_compiler option
-   ; compiler_state : v
-   ; env_merge : v -> v -> v |>`;
+   ; compiler_state : v |>`;
 
 
 (*val default_eval_state : eval_state*)
 val _ = Define `
  (default_eval_state=  
  (<| compiler := NONE
-   ; compiler_state := (Conv NONE [])
-   ; env_merge := (\ x .  (\ y .  y)) |>))`;
+   ; compiler_state := (Conv NONE []) |>))`;
 
 
 val _ = Hol_datatype `
@@ -284,6 +281,7 @@ val _ = Hol_datatype `
    ; ffi : 'ffi ffi_state
    ; next_type_stamp : num
    ; next_exn_stamp : num
+   ; next_env_stamp : num
    ; eval : eval_state
    |>`;
 
@@ -1096,11 +1094,11 @@ val _ = Define `
  (v_to_decs v=  ($some (\ ds .  (v = decs_to_v ds))))`;
 
 
-(*val v_to_env : v -> maybe (sem_env v * v)*)
+(*val v_to_env : v -> maybe (sem_env v * nat)*)
 val _ = Define `
  (v_to_env v=  
  ((case v of
-    Env env concrete_env => SOME (env, concrete_env)
+    Env env i => SOME (env, i)
   | _ => NONE
   )))`;
 
@@ -1113,8 +1111,8 @@ val _ = Define `
     [compiler_v; st_v; env_v; decs_v] =>
       (case (do_opapp [compiler_v; Conv NONE [st_v; env_v; decs_v]],
           v_to_env env_v, v_to_decs decs_v) of
-        (SOME (env1, x), SOME (env2, arg_env), SOME decs) =>
-          SOME ((env1, x), env2, <| a_env := arg_env; a_state := st_v; decs := decs |>)
+        (SOME (env1, x), SOME (env2, i), SOME decs) =>
+          SOME ((env1, x), env2, <| env := i; a_state := st_v; decs := decs |>)
       | _ => NONE
       )
   | _ => NONE
@@ -1208,18 +1206,17 @@ val _ = Define `
 
 
 (* check a concrete Eval compiler call succeeded and matched the
-   abstract compiler, and update the abstract compiler state and env *)
-(*val check_eval : eval_state -> compiler_args -> v -> maybe (bool * v * eval_state)*)
+   abstract compiler, and update the abstract compiler state *)
+(*val check_eval : eval_state -> compiler_args -> v -> maybe (bool * eval_state)*)
 val _ = Define `
  (check_eval es args v=  
  ((case (es.compiler, v) of
-    (SOME f, Conv NONE [env_v; st_v; bytes_v; words_v]) =>
+    (SOME f, Conv NONE [st_v; bytes_v; words_v]) =>
       (case (f args, v_to_word8_list bytes_v, v_to_nat_list words_v)
         of
         (SOME x, SOME bs, SOME ws) =>
-          if match_v env_v x.r_env /\ match_v st_v x.r_state /\ (bs = x.code) /\ (ws = x.data)
-          then SOME (~ (bs = []), es.env_merge env_v args.a_env,
-              ( es with<| compiler_state := st_v |>))
+          if match_v st_v x.r_state /\ (bs = x.code) /\ (ws = x.data)
+          then SOME (~ (bs = []), ( es with<| compiler_state := st_v |>))
           else NONE
       | _ => NONE
       )
