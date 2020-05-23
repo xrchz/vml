@@ -44,16 +44,17 @@ val _ = Define `
 val _ = Define `
  (check_after_eval1 args r st=  ((case check_eval st.eval args r of
     NONE => (st, Rerr (Rabort Rtype_error))
-  | SOME (b, e_s) => (( st with<| eval := e_s; next_env_stamp := (st.next_env_stamp +( 1 : num)) |>),
-      Rval (b, st.next_env_stamp))
+  | SOME (b, st_v, e_s) =>
+    (( st with<| eval := e_s; next_env_stamp := (st.next_env_stamp +( 1 : num)) |>),
+      Rval (b, st_v, st.next_env_stamp))
   )))`;
 
 
 val _ = Define `
  (check_after_eval2 args r st=  ((case check_after_eval1 args r st of
-    (st', Rval (T, env_id)) => if st'.clock =( 0 : num)
+    (st', Rval (T, st_v, env_id)) => if st'.clock =( 0 : num)
     then (st', Rerr (Rabort Rtimeout_error))
-    else (dec_clock st', Rval (T, env_id))
+    else (dec_clock st', Rval (T, st_v, env_id))
   | v => v
   )))`;
 
@@ -133,11 +134,16 @@ val _ = Define `
           (st'', Rval [r]) =>
     (case check_after_eval2 args r st'' of
           (st''', Rerr e) => (st''', Rerr e)
-      | (st''', Rval (F, env_id)) => (st''', Rval [Env env env_id])
-      | (st''', Rval (T, env_id)) =>
+      | (st''', Rval (F, st_v, env_id)) => (st''',
+                                           Rval
+                                             [Conv NONE
+                                                [Env env env_id; st_v]])
+      | (st''', Rval (T, st_v, env_id)) =>
     (case fix_clock st''' (evaluate_decs st''' env args.decs) of
           (st'''', Rval env') => (st'''',
-                                 Rval [Env (extend_dec_env env' env) env_id])
+                                 Rval
+                                   [Conv NONE
+                                      [Env (extend_dec_env env' env) env_id; st_v]])
       | (st''', Rerr e) => (st''', Rerr e)
     )
     )

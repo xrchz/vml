@@ -256,7 +256,7 @@ val _ = Hol_datatype `
  compiler_res =
   <| r_state : v
    ; code : word8 list
-   ; data : num list (* target-length words represented by naturals *)
+   ; data : word64 list (* target-length words, might only use 32 bit *)
   |>`;
 
 val _ = type_abbrev( "abstract_compiler" , ``: compiler_args ->  compiler_res option``);
@@ -1166,11 +1166,10 @@ val _ = Define `
   )))`;
 
 
-(*val v_to_nat : v -> maybe nat*)
+(*val v_to_word64 : v -> maybe word64*)
 val _ = Define `
- (v_to_nat v=  ((case v of
-    Litv (Word8 w) => SOME (w2n w)
-  | Litv (Word64 w) => SOME (w2n w)
+ (v_to_word64 v=  ((case v of
+    Litv (Word64 w) => SOME w
   | _ => NONE
   )))`;
 
@@ -1189,14 +1188,6 @@ val _ = Define `
 
 val _ = Lib.with_flag (computeLib.auto_import_definitions, false) Defn.save_defn maybe_all_list_defn;
 
-(*val v_to_nat_list : v -> maybe (list nat)*)
-val _ = Define `
- (v_to_nat_list v=  ((case v_to_list v of
-    SOME xs => maybe_all_list (MAP v_to_nat xs)
-  | NONE => NONE
-  )))`;
-
-
 (*val v_to_word8_list : v -> maybe (list word8)*)
 val _ = Define `
  (v_to_word8_list v=  ((case v_to_list v of
@@ -1205,18 +1196,26 @@ val _ = Define `
   )))`;
 
 
+(*val v_to_word64_list : v -> maybe (list word64)*)
+val _ = Define `
+ (v_to_word64_list v=  ((case v_to_list v of
+    SOME xs => maybe_all_list (MAP v_to_word64 xs)
+  | NONE => NONE
+  )))`;
+
+
 (* check a concrete Eval compiler call succeeded and matched the
    abstract compiler, and update the abstract compiler state *)
-(*val check_eval : eval_state -> compiler_args -> v -> maybe (bool * eval_state)*)
+(*val check_eval : eval_state -> compiler_args -> v -> maybe (bool * v * eval_state)*)
 val _ = Define `
  (check_eval es args v=  
  ((case (es.compiler, v) of
     (SOME f, Conv NONE [st_v; bytes_v; words_v]) =>
-      (case (f args, v_to_word8_list bytes_v, v_to_nat_list words_v)
+      (case (f args, v_to_word8_list bytes_v, v_to_word64_list words_v)
         of
         (SOME x, SOME bs, SOME ws) =>
           if match_v st_v x.r_state /\ (bs = x.code) /\ (ws = x.data)
-          then SOME (~ (bs = []), ( es with<| compiler_state := st_v |>))
+          then SOME (~ (bs = []), st_v, ( es with<| compiler_state := st_v |>))
           else NONE
       | _ => NONE
       )

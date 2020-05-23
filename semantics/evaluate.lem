@@ -27,14 +27,15 @@ list_result (Rerr e) = Rerr e
 
 let check_after_eval1 args r st = match check_eval st.eval args r with
   | Nothing -> (st, Rerr (Rabort Rtype_error))
-  | Just (b, e_s) -> (<| st with eval = e_s; next_env_stamp = st.next_env_stamp + 1 |>,
-      Rval (b, st.next_env_stamp))
+  | Just (b, st_v, e_s) ->
+    (<| st with eval = e_s; next_env_stamp = st.next_env_stamp + 1 |>,
+      Rval (b, st_v, st.next_env_stamp))
   end
 
 let check_after_eval2 args r st = match check_after_eval1 args r st with
-  | (st', Rval (true, env_id)) -> if st'.clock = 0
+  | (st', Rval (true, st_v, env_id)) -> if st'.clock = 0
     then (st', Rerr (Rabort Rtimeout_error))
-    else (dec_clock st', Rval (true, env_id))
+    else (dec_clock st', Rval (true, st_v, env_id))
   | v -> v
   end
 
@@ -115,11 +116,12 @@ evaluate st env [App op es] =
               | (st'', Rval [r]) ->
                   match check_after_eval2 args r st'' with
                   | (st''', Rerr e) -> (st''', Rerr e)
-                  | (st''', Rval (false, env_id)) -> (st''', Rval [Env env env_id])
-                  | (st''', Rval (true, env_id)) ->
+                  | (st''', Rval (false, st_v, env_id)) -> (st''',
+                              Rval [Conv Nothing [Env env env_id; st_v]])
+                  | (st''', Rval (true, st_v, env_id)) ->
                       match fix_clock st''' (evaluate_decs st''' env args.decs) with
                       | (st'''', Rval env') -> (st'''',
-                              Rval [Env (extend_dec_env env' env) env_id])
+                              Rval [Conv Nothing [Env (extend_dec_env env' env) env_id; st_v]])
                       | (st''', Rerr e) -> (st''', Rerr e)
                       end
                   end

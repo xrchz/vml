@@ -159,7 +159,7 @@ type compiler_args =
 type compiler_res =
   <| r_state : v
    ; code : list word8
-   ; data : list nat (* target-length words represented by naturals *)
+   ; data : list word64 (* target-length words, might only use 32 bit *)
   |>
 type abstract_compiler = compiler_args -> maybe compiler_res
 
@@ -953,10 +953,9 @@ let v_to_word8 v = match v with
   | _ -> Nothing
   end
 
-val v_to_nat : v -> maybe nat
-let v_to_nat v = match v with
-  | Litv (Word8 w) -> Just (natFromWord8 w)
-  | Litv (Word64 w) -> Just (natFromWord64 w)
+val v_to_word64 : v -> maybe word64
+let v_to_word64 v = match v with
+  | Litv (Word64 w) -> Just w
   | _ -> Nothing
   end
 
@@ -971,29 +970,29 @@ let rec maybe_all_list v =
     end
   end
 
-val v_to_nat_list : v -> maybe (list nat)
-let v_to_nat_list v = match v_to_list v with
-  | Just xs -> maybe_all_list (List.map v_to_nat xs)
-  | Nothing -> Nothing
-  end
-
 val v_to_word8_list : v -> maybe (list word8)
 let v_to_word8_list v = match v_to_list v with
   | Just xs -> maybe_all_list (List.map v_to_word8 xs)
   | Nothing -> Nothing
   end
 
+val v_to_word64_list : v -> maybe (list word64)
+let v_to_word64_list v = match v_to_list v with
+  | Just xs -> maybe_all_list (List.map v_to_word64 xs)
+  | Nothing -> Nothing
+  end
+
 (* check a concrete Eval compiler call succeeded and matched the
    abstract compiler, and update the abstract compiler state *)
-val check_eval : eval_state -> compiler_args -> v -> maybe (bool * eval_state)
+val check_eval : eval_state -> compiler_args -> v -> maybe (bool * v * eval_state)
 let check_eval es args v =
   match (es.compiler, v) with
   | (Just f, Conv Nothing [st_v; bytes_v; words_v]) ->
-      match (f args, v_to_word8_list bytes_v, v_to_nat_list words_v)
+      match (f args, v_to_word8_list bytes_v, v_to_word64_list words_v)
         with
       | (Just x, Just bs, Just ws) ->
           if match_v st_v x.r_state && bs = x.code && ws = x.data
-          then Just (not (bs = []), <| es with compiler_state = st_v |>)
+          then Just (not (bs = []), st_v, <| es with compiler_state = st_v |>)
           else Nothing
       | _ -> Nothing
       end
