@@ -49,18 +49,25 @@ val _ = Datatype `
     ; compile_oracle : num -> 'c # flatLang$dec list
     |>`
 
-Type compile_env = ``: source_to_flat$environment``;
-
 val _ = Datatype`
   eval_compiler_config =
-   <| compile : compile_env -> 'c -> ast$dec list
-                  -> flatLang$dec list # compile_env # 'c
-    ; compiler_state : 'c |>`;
+   <|
+    (* abstract compiler is the same as in the source semantics *)
+      compiler_state : semanticPrimitives$v
+    ; abstract_compiler : semanticPrimitives$abstract_compiler option
+    (* extra compiler produces flat decs to be eval-ed here *)
+    ; flat_compiler : compiler_args -> flatLang$dec list
+    (* sequence of compile events that have happened *)
+    ; compile_seq : num -> compiler_args # compiler_res
+    ; next_queued : num
+    ; next_free : num
+    |>`;
 
-val _ = Datatype `
+Datatype:
   eval_config =
-    | Eval ('c eval_compiler_config)
-    | Install ('c install_config) (* not the same 'c as for Eval *)`
+    | Eval eval_compiler_config
+    | Install ('c install_config)
+End
 
 val _ = Datatype`
   state = <|
@@ -220,37 +227,11 @@ val v_to_words_def = Define `
   v_to_words lv = some ns. v_to_list lv = SOME (MAP (Litv o Word64) ns)`;
 
 (*
-val namespace_to_v_def = Define`
-  namespace_to_v (Bind l1 l2) =
-    Conv (SOME 0)
-      (list_to_v l1)
-      (list_to_v l2)
-
-val environment_to_v_def = Define`
-  environment_to_v env =
-    Conv (SOME 0)
-      (namespace_to_v char_l env.c)
-      (namespace_to_v env.v)`;
-*)
-
-val environment_to_v_def = Define`
-  environment_to_v (env:compile_env) = ARB : v`; (* TODO *)
-
-val v_to_environment_def = Define`
-  v_to_environment v = some env. environment_to_v env = v`;
-
-(*
 val constructors_to_v_def = Define`
   constructors_to_v (semanticPrimitives$Conv name vs) =
     flatSem$Conv name (MAP constructors_to_v vs)`;
 have to deal with genv.c to get this to work, the stamp mapping
 *)
-
-val decs_to_v_def = Define`
-  decs_to_v (ds : ast$dec list) = ARB : flatSem$v`; (* TODO *)
-
-val v_to_decs_def = Define`
-  v_to_decs v = some ds. flatSem$decs_to_v ds = v`;
 
 val do_app_def = Define `
   do_app s op (vs:flatSem$v list) =
@@ -664,22 +645,48 @@ val is_fresh_exn_def = Define `
   is_fresh_exn exn_id ctors ⇔
     !ctor. ctor ∈ ctors ⇒ !arity. ctor ≠ ((exn_id, NONE), arity)`;
 
-Definition do_pre_eval_def:
-  do_pre_eval (vs : v list) ec = case (ec, vs) of
-    | (Install _, _) => SOME NONE
-    | (Eval _, [compilerv; envv; dsv]) => (case
-        do_opapp [compilerv; Conv NONE [envv; dsv]] of
-      | SOME r => SOME (SOME r)
-      | NONE => NONE)
+Definition v_to_nat_def:
+  v_to_nat (v : v) = case v of
+    | Litv (IntLit i) => SOME (Num i)
     | _ => NONE
 End
 
+Definition v_to_decs_def:
+  v_to_decs (v : v) = SOME (ARB v : ast$dec list)
+End
+
+Definition do_eval_setup_def:
+  do_eval_setup (vs : v list) ec = case (ec, vs) of
+    | (Install _, _) => NONE
+    | (Eval es, [compiler_v; st_v; env_v; ds_v]) => (case
+        (do_opapp [compiler_v; Conv NONE [st_v; env_v; ds_v]],
+            v_to_nat env_v, v_to_decs (ds_v : v)) of
+      | (SOME r, SOME env_id, SOME decs) => SOME (r,
+          <| a_state := es.compiler_state; env := env_id; decs := decs |>)
+      | _ => NONE)
+    | _ => NONE
+End
+
+Definition check_eval_setup_def:
+  check_eval_setup ec args v = case (ec, v) of
+    | (Install _, _) => NONE
+    | (Eval es, Conv Nothing [st_v; bytes_v; words_v]) => (case
+        (es.abstract_compiler, v_to_bytes bytes_v, v_to_words words_v) of
+          | (SOME f, SOME bs, SOME ws) => (case f args of
+              SOME x => if bs = x.code /\ ws = x.data
+                then SOME (bs <> [], es with <| compiler_state := x.r_state |>)
+                else NONE
+          | _ => NONE
+        )
+    )
+End
+
 Definition do_eval_def:
-  do_eval (vs :v list) ev_mode compiler_r =
+  do_eval (vs :v list) ev_mode =
     case ev_mode of
     | flatSem$Eval ec =>
-      (case (compiler_r, vs) of
-       | (SOME (Conv NONE [words_v; bytes_v; res_v]), [_; env_v; ds_v]) =>
+      (case vs of
+       | [bytes_v; words_v] =>
          (case (v_to_list words_v, v_to_list bytes_v,
                      v_to_environment env_v, flatSem$v_to_decs ds_v) of
            | (SOME words, SOME bytes, SOME env, SOME ds) =>
@@ -767,11 +774,13 @@ Definition evaluate_def:
             else
               evaluate env' (dec_clock s) [e]
           | NONE => (s, Rerr (Rabort Rtype_error)))
+       else if op = flatLang$EvalSetup then
+
        else if op = flatLang$Eval then
          let res = (case do_pre_eval (REVERSE vs) s.eval_mode of
            | NONE => (s, Rerr (Rabort Rtype_error))
            | SOME NONE => (s, Rval NONE)
-           | SOME (SOME (env', x)) => 
+           | SOME (SOME (env', x)) =>
              if s.clock = 0 then
                (s, Rerr (Rabort Rtimeout_error))
              else

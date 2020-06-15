@@ -95,6 +95,7 @@ val _ = Datatype `
   | GlobalVarLookup num
   (* Evaluate some declarations *)
   | Eval
+  | EvalSetup
   (* for pattern match compilation *)
   | TagLenEq num num
   | LenEq num
