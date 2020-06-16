@@ -91,7 +91,7 @@ Definition has_Eval_def1:
   (has_Eval (Handle t e pes) = (has_Eval e ∨ EXISTS has_Eval (MAP SND pes))) ∧
   (has_Eval (Con t id_option es) = EXISTS has_Eval es) ∧
   (has_Eval (Fun t name body) = has_Eval body) ∧
-  (has_Eval (App t op es) = (op = Eval ∨ EXISTS has_Eval es)) ∧
+  (has_Eval (App t op es) = (op = Eval ∨ op = EvalSetup ∨ EXISTS has_Eval es)) ∧
   (has_Eval (If t e1 e2 e3) = (has_Eval e1 ∨ has_Eval e2 ∨ has_Eval e3)) ∧
   (has_Eval (Mat t e pes) = (has_Eval e ∨ EXISTS has_Eval (MAP SND pes))) ∧
   (has_Eval (Let t opt e1 e2) = (has_Eval e1 ∨ has_Eval e2)) ∧

@@ -644,13 +644,17 @@ val sv_rel_weak = Q.prove (
   srw_tac[][sv_rel_cases] >>
   metis_tac [v_rel_weak, LIST_REL_EL_EQN]);
 
-Definition inc_compile_def:
-  inc_compile env st decs =
-  let (_, st', env', decs') = source_to_flat$compile_decs [] 0 st env decs in
-  (glob_alloc st' (<| next := st |>) :: decs', env', st')
+Definition flat_compile_def:
+  flat_compile st env_id decs =
+    (case lookup env_id st.env_trace.envs of
+      | NONE => ([], st)
+      | SOME env =>
+    let (_,next',_,_,decs') = source_to_flat$compile_decs [] 0
+         st.next env st.env_trace decs in
+    (glob_alloc next' st :: decs', st with next := next'))
 End
 
-Type compiler_state[local] = ``: next_indices``
+Type compiler_state[local] = ``: source_to_flat$config``
 
 Inductive s_rel:
   (!genv s s'.
@@ -1535,8 +1539,7 @@ val pmatch = Q.prove (
     comp_map2.c = comp_map.c ∧
     env = env' ++ env'' ∧
     s_i1.globals = genv.v ∧
-    st' = <| clock := clk; refs := s; ffi := ffi; next_type_stamp := nts;
-                    next_exn_stamp := nes |> ∧
+    s = st'.refs ∧
     v_rel genv v v_i1 ∧
     env_rel genv (alist_to_ns env') env_i1
     ⇒
@@ -1553,8 +1556,7 @@ val pmatch = Q.prove (
     env = env' ++ env'' ∧
     s_i1.globals = genv.v ∧
     s_rel genv st' s_i1 ∧
-    st' = <| clock := clk; refs := s; ffi := ffi; next_type_stamp := nts;
-                    next_exn_stamp := nes |> ∧
+    s = st'.refs ∧
     LIST_REL (v_rel genv) vs vs_i1 ∧
     env_rel genv (alist_to_ns env') env_i1
     ⇒
@@ -1611,9 +1613,9 @@ val pmatch = Q.prove (
           fs [] >> fs [] >>
           srw_tac[][])
       >> full_simp_tac(srw_ss())[store_lookup_def, LIST_REL_EL_EQN] >>
-          srw_tac[][] >>
-          full_simp_tac(srw_ss())[sv_rel_cases] >>
-          metis_tac [store_v_distinct])
+      rev_full_simp_tac(srw_ss())[] >>
+      first_x_assum drule >>
+      simp [sv_rel_cases])
   >- (
       rfs [] >>
       first_x_assum (q_part_match_pat_tac
@@ -1759,6 +1761,14 @@ Definition idx_final_block_def:
   {(i, Idx_Exn) | start_idx.eidx ≤ i}
 End
 
+Definition eval_at_idx_def:
+  eval_at_idx eval_mode idx =
+  ?ec st. eval_mode = flatSem$Eval ec /\
+    ec.flat_compiler = flat_compile /\
+    ec.flat_compiler_state = st /\
+    st.next = idx
+End
+
 (* the compiler allocates names in order in blocks, one block for the initial
    compile and one for each Eval instance. however, the declarations in the
    block do not necessarily evaluate in the same order. so, idx..end_idx is
@@ -1769,7 +1779,7 @@ Definition idx_range_rel_def:
   idx_range_rel genv s_n_ts s_n_en s_eval idxs ⇔
     ?idx end_idx fin_idx other_blocks.
     idxs = (idx, end_idx, other_blocks) ∧
-    s_eval = Eval <| compile := inc_compile; compiler_state := fin_idx |> ∧
+    eval_at_idx s_eval fin_idx  ∧
     idx_prev end_idx fin_idx ∧
     ALL_DISJOINT [idx_block idx end_idx; idx_final_block fin_idx; other_blocks;
         {(i, Idx_Var) | i < LENGTH genv.v ∧ EL i genv.v <> NONE} ∪
@@ -1781,13 +1791,21 @@ Definition idx_range_rel_def:
 End
 
 Definition eval_idx_match_len_def:
-  eval_idx_match_len s_eval len <=> ? fin_idx comp.
-    s_eval = Eval <| compile := comp; compiler_state := fin_idx |> ∧
-    fin_idx.vidx = len
+  eval_idx_match_len s_eval len <=> ? idx.
+    eval_at_idx s_eval idx /\ idx.vidx = len
 End
 
 Overload s_eval_idx_match[local] = ``\s.
     eval_idx_match_len s.eval_mode (LENGTH s.globals)``;
+
+Definition eval_state_rel_def:
+  eval_state_rel (es : semanticPrimitives$eval_state) eval_mode =
+  ?ec.  eval_mode = Eval ec /\
+  ec.abstract_compiler = es.compiler /\
+  ec.abstract_compiler_state = es.compiler_state /\
+  ec.flat_compiler = flat_compile /\
+  ec.next_queued = ec.next_free
+End
 
 Definition invariant_def:
   invariant genv idxs s s_i1 ⇔
@@ -1795,6 +1813,7 @@ Definition invariant_def:
     genv_c_tys_ok genv.c genv.tys ∧
     s_rel genv s s_i1 ∧
     idx_range_rel genv s.next_type_stamp s.next_exn_stamp s_i1.eval_mode idxs ∧
+    eval_state_rel s.eval s_i1.eval_mode ∧
     genv.v = s_i1.globals
 End
 
@@ -1816,7 +1835,7 @@ Proof
   \\ drule_then drule (pmatch |> CONJUNCT1)
   \\ rpt (disch_then drule)
   \\ disch_then (q_part_match_pat_tac `pmatch _ _ _ _` mp_tac)
-  \\ simp [semanticPrimitivesTheory.state_component_equality, v_rel_rules]
+  \\ simp [v_rel_rules]
   \\ rw []
   \\ imp_res_tac match_result_rel_imp \\ fs [match_result_rel_def]
   \\ TOP_CASE_TAC \\ fs []
@@ -1877,12 +1896,9 @@ QED
 
 Theorem invariant_eval_mode:
    invariant genv env st1 st2 ⇒
-   ? fin_idx. st2.eval_mode =
-   Eval <| compile := inc_compile; compiler_state := fin_idx |>
+   eval_state_rel st1.eval st2.eval_mode
 Proof
-  simp [invariant_def, dec_clock_def, evaluateTheory.dec_clock_def]
-  \\ rw [s_rel_cases, idx_range_rel_def]
-  \\ simp []
+  simp [invariant_def]
 QED
 
 Triviality eval_mode_unchanged:
@@ -1932,8 +1948,8 @@ Proof
 QED
 
 Theorem compile_decs_idx_prev:
-  !t n next env ds n' next' env' ds_i1.
-    compile_decs t n next env ds = (n', next',env',ds_i1)
+  !t n next env envs ds n' next' env' envs' ds_i1.
+    compile_decs t n next env envs ds = (n', next',env',envs',ds_i1)
     ⇒
     idx_prev next next'
 Proof
@@ -1981,7 +1997,7 @@ Theorem idx_range_shrink:
   ⇒
   idx_range_rel genv nts nes eval_mode (l_idx', r_idx, others)
 Proof
-  rw [idx_range_rel_def]
+  rw [idx_range_rel_def, eval_at_idx_def]
   \\ drule_then irule ALL_DISJOINT_SUBSETS
   \\ simp [SUBSET_DEF]
   \\ simp [idx_block_def]
@@ -2110,7 +2126,7 @@ Theorem idx_range_rel_v_REPLICATE_NONE:
   ?pre post. genv.v = pre ++ REPLICATE n NONE ++ post ∧
     LENGTH pre = idx.vidx
 Proof
-  rw [idx_range_rel_def, eval_idx_match_len_def]
+  rw [idx_range_rel_def, eval_idx_match_len_def, eval_at_idx_def]
   \\ qexists_tac `TAKE idx.vidx genv.v`
   \\ qexists_tac `DROP (idx.vidx + n) genv.v`
   \\ fs [idx_prev_def]
@@ -2311,7 +2327,7 @@ Proof
   \\ qexists_tac `genv with v :=
     pre ++ MAP SOME (REVERSE (MAP SND env.v)) ++ post`
   \\ simp [subglobals_refl_append, subglobals_NONE]
-  \\ fs [eval_idx_match_len_def]
+  \\ fs [eval_idx_match_len_def, eval_at_idx_def]
   \\ rpt conj_tac
   >- (
     fs [s_rel_cases]
@@ -2319,7 +2335,8 @@ Proof
     \\ simp [subglobals_refl_append, subglobals_NONE]
   )
   >- (
-    fs [idx_range_rel_def]
+    fs [idx_range_rel_def, eval_at_idx_def]
+    \\ rveq \\ fs []
     \\ simp [EL_add_SOME_SOME]
     \\ drule_then irule (Q.SPECL [`0`, `3`] ALL_DISJOINT_MOVE)
     \\ simp []
@@ -2347,35 +2364,11 @@ Proof
   \\ simp [ELIM_UNCURRY, ETA_THM]
 QED
 
-Theorem v_to_environment:
-  v_to_env v = SOME env ∧ v_rel genv v v' ⇒
-  ?comp_map. v_to_environment v' = SOME comp_map ∧
-  global_env_inv genv comp_map {} env
-Proof
-  cheat
-QED
-
 Theorem v_to_decs:
   v_to_decs v = SOME ds ∧ v_rel genv v v' ⇒
   v_to_decs v' = SOME ds
 Proof
   cheat
-QED
-
-Theorem v_rel_environment_to_v:
-  global_env_inv genv comp_map {} env ==>
-  v_rel genv (Env env) (environment_to_v comp_map)
-Proof
-  cheat
-QED
-
-Theorem v_to_environment_some:
-  v_to_environment v = SOME env ==> v = environment_to_v env
-Proof
-  rw [v_to_environment_def, some_def]
-  \\ simp []
-  (* yuck, needs injectivity *)
-  \\ cheat
 QED
 
 Theorem genv_c_ok_extend:
@@ -2448,13 +2441,15 @@ QED
 (* for a special case where the indexes are advanced but not used *)
 Theorem invariant_just_advance_compiler_state:
   invariant genv idxs st st' ∧
-  st'.eval_mode = Eval e ∧ e2.compile = e.compile ∧
-  idx_prev e.compiler_state e2.compiler_state ⇒
+  st'.eval_mode = Eval e ∧
+  (?f_st. e2 = e with <| flat_compiler_state := f_st |>) ∧
+  idx_prev e.flat_compiler_state.next e2.flat_compiler_state.next ⇒
   invariant genv idxs st (st' with <| eval_mode := Eval e2 |>)
 Proof
-  rw [invariant_def]
-  \\ fs [idx_range_rel_def, s_rel_cases, idx_prev_def]
-  \\ simp [eval_compiler_config_component_equality]
+  rw []
+  \\ fs [invariant_def]
+  \\ fs [idx_range_rel_def, s_rel_cases, idx_prev_def, eval_at_idx_def]
+  \\ fs [eval_state_rel_def]
   \\ rveq \\ fs []
   \\ drule_then irule ALL_DISJOINT_SUBSETS
   \\ simp_tac list_ss [SUBSET_REFL]
@@ -2511,7 +2506,7 @@ Theorem invariant_end_eval:
   invariant genv (idx, end_idx, other) st st'
 Proof
   rw [invariant_def]
-  \\ fs [idx_range_rel_def]
+  \\ fs [idx_range_rel_def, eval_at_idx_def]
   \\ conj_tac >- metis_tac [idx_prev_trans]
   \\ drule (Q.SPECL [`2`, `0`, `mv_set`, `[_; _; mv_set ∪ other; _]`]
         ALL_DISJOINT_MOVE)
@@ -2595,7 +2590,7 @@ Proof
     fs [alloc_tags1_def] \\ rveq \\ fs []
     \\ qexists_tac `genv`
     \\ simp [lookup_def, build_constrs_def, v_rel_cases, env_domain_eq_def]
-    \\ fs [idx_range_rel_def]
+    \\ fs [idx_range_rel_def, eval_at_idx_def]
     \\ drule_then irule ALL_DISJOINT_SUBSETS
     \\ simp []
     \\ simp [SUBSET_DEF, idx_block_def]
@@ -2620,7 +2615,7 @@ Proof
     \\ fs []
     \\ TRY strip_tac
     \\ rveq \\ fs []
-    \\ fs [idx_range_rel_def]
+    \\ fs [idx_range_rel_def, eval_at_idx_def]
     \\ rfs [FRANGE_FLOOKUP]
     \\ qspecl_then [`(i,Idx_Type)`, `0`] drule ALL_DISJOINT_elem
     \\ simp [idx_block_def]
@@ -2633,7 +2628,7 @@ Proof
     \\ simp [genv_c_tys_ok_def]
     \\ conj_tac
     >- (
-      fs [idx_range_rel_def, genv_c_tys_ok_def]
+      fs [idx_range_rel_def, eval_at_idx_def, genv_c_tys_ok_def]
       \\ qspecl_then [`(i,Idx_Type)`, `0`] drule ALL_DISJOINT_elem
       \\ simp []
       \\ disch_then (qspec_then `idx.tidx` mp_tac)
@@ -2652,7 +2647,7 @@ Proof
     \\ metis_tac []
   )
   >- (
-    fs [idx_range_rel_def]
+    fs [idx_range_rel_def, eval_at_idx_def]
     \\ rw []
     \\ fs [FRANGE_FLOOKUP, FLOOKUP_FUNION, option_case_eq, FLOOKUP_UPDATE]
     \\ TRY (CCONTR_TAC \\ fs [] \\ imp_res_tac ALOOKUP_MEM
@@ -2679,7 +2674,7 @@ Proof
     \\ imp_res_tac alistTheory.ALOOKUP_ALL_DISTINCT_MEM
     \\ simp [ALOOKUP_MAP_3, FLOOKUP_FUNION]
     \\ simp [option_case_eq, ALOOKUP_MAP_3]
-    \\ rfs [idx_range_rel_def, FLOOKUP_UPDATE]
+    \\ rfs [idx_range_rel_def, eval_at_idx_def, FLOOKUP_UPDATE]
     \\ qspecl_then [`(i,Idx_Type)`, `0`] drule ALL_DISJOINT_elem
     \\ simp []
     \\ disch_then (qspec_then `idx.tidx` mp_tac)
@@ -2735,14 +2730,6 @@ val extend_dec_env_v_empty =
 ``extend_dec_env <| c := c; v := nsEmpty |> <| c := c'; v := nsEmpty |>``
   |> SIMP_CONV (srw_ss ()) [extend_dec_env_def]
 
-Theorem compile_env_exp:
-  global_env_inv genv comp_map ∅ env ==>
-  ?v. evaluate env' s [compile_env_exp t comp_map] = (s, Rval [v])
-  /\ v_rel genv (Env env) v
-Proof
-  cheat
-QED
-
 Theorem nsLookup_nsBind_If:
   nsLookup (nsBind n v e) nm = (if nm = Short n then SOME v else nsLookup e nm)
 Proof
@@ -2764,10 +2751,6 @@ Theorem invariant_to_st_refs:
 Proof
   simp [invariant_def, s_rel_cases]
 QED
-
-Theorem eval_res_eq_some = ``eval_res r = SOME v``
-  |> SIMP_CONV (bool_ss ++ optionSimps.OPTION_ss)
-    [semanticPrimitivesTheory.eval_res_def, AllCaseEqs (), PULL_EXISTS]
 
 Definition Case_def:
   Case X <=> T
@@ -3152,7 +3135,7 @@ Proof
     (* dance around doing the case split on null compiler result too early *)
     \\ fs [list_case_eq, pair_case_eq, result_case_eq]
     \\ rveq \\ fs []
-    \\ fs [option_case_eq, pair_case_eq, eval_res_eq_some]
+    \\ fs [option_case_eq, pair_case_eq]
     \\ rveq \\ fs []
     \\ fs [v_rel_eqns] \\ rveq \\ fs []
     \\ imp_res_tac invariant_genv_c_ok

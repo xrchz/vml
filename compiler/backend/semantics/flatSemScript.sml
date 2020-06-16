@@ -4,7 +4,6 @@
 
 open preamble flatLangTheory
      semanticPrimitivesPropsTheory
-     source_to_flatTheory
 
 val _ = new_theory "flatSem";
 
@@ -53,19 +52,20 @@ val _ = Datatype`
   eval_compiler_config =
    <|
     (* abstract compiler is the same as in the source semantics *)
-      compiler_state : semanticPrimitives$v
+      abstract_compiler_state : semanticPrimitives$v
     ; abstract_compiler : semanticPrimitives$abstract_compiler option
     (* extra compiler produces flat decs to be eval-ed here *)
-    ; flat_compiler : compiler_args -> flatLang$dec list
-    (* sequence of compile events that have happened *)
-    ; compile_seq : num -> compiler_args # compiler_res
+    ; flat_compiler : 'c -> num -> ast$dec list -> (flatLang$dec list # 'c)
+    ; flat_compiler_state : 'c
+    (* sequence of abstract compile events that have happened *)
+    ; compile_seq : num |-> compiler_args # compiler_res
     ; next_queued : num
     ; next_free : num
     |>`;
 
 Datatype:
   eval_config =
-    | Eval eval_compiler_config
+    | Eval ('c eval_compiler_config)
     | Install ('c install_config)
 End
 
@@ -660,25 +660,19 @@ Definition do_eval_setup_def:
     | (Install _, _) => NONE
     | (Eval es, [compiler_v; st_v; env_v; ds_v]) => (case
         (do_opapp [compiler_v; Conv NONE [st_v; env_v; ds_v]],
-            v_to_nat env_v, v_to_decs (ds_v : v)) of
-      | (SOME r, SOME env_id, SOME decs) => SOME (r,
-          <| a_state := es.compiler_state; env := env_id; decs := decs |>)
+            v_to_nat env_v, v_to_decs (ds_v : v), es.abstract_compiler) of
+      | (SOME r, SOME env_id, SOME decs, SOME c_f) =>
+        let args = <| a_state := es.abstract_compiler_state;
+                env := env_id; decs := decs |> in
+        (case c_f args of
+          | NONE => NONE
+          | SOME res => SOME (r,
+              Eval (es with <|
+                  next_free := es.next_free + 1;
+                  compile_seq := es.compile_seq |+ (es.next_free, (args, res));
+                  abstract_compiler_state := res.r_state |>)))
       | _ => NONE)
     | _ => NONE
-End
-
-Definition check_eval_setup_def:
-  check_eval_setup ec args v = case (ec, v) of
-    | (Install _, _) => NONE
-    | (Eval es, Conv Nothing [st_v; bytes_v; words_v]) => (case
-        (es.abstract_compiler, v_to_bytes bytes_v, v_to_words words_v) of
-          | (SOME f, SOME bs, SOME ws) => (case f args of
-              SOME x => if bs = x.code /\ ws = x.data
-                then SOME (bs <> [], es with <| compiler_state := x.r_state |>)
-                else NONE
-          | _ => NONE
-        )
-    )
 End
 
 Definition do_eval_def:
@@ -688,22 +682,22 @@ Definition do_eval_def:
       (case vs of
        | [bytes_v; words_v] =>
          (case (v_to_list words_v, v_to_list bytes_v,
-                     v_to_environment env_v, flatSem$v_to_decs ds_v) of
-           | (SOME words, SOME bytes, SOME env, SOME ds) =>
+                     ec.next_free > ec.next_queued,
+                     FLOOKUP ec.compile_seq ec.next_queued) of
+           | (SOME words, SOME bytes, T, SOME (c_args, c_res)) =>
+             let (fdecs, f_st) = ec.flat_compiler ec.flat_compiler_state
+                 c_args.env c_args.decs in 
+             let next_ec = ec with <| next_queued := ec.next_queued + 1;
+                 flat_compiler_state := f_st |> in
              if NULL words
-             then SOME (NONE, ev_mode, Conv NONE [env_v; res_v])
-             else
-             let (decs, env', new_st) = ec.compile env ec.compiler_state ds in
-             let merge_env = source_to_flat$extend_env env' env in
-               SOME (SOME decs,
-                     Eval (ec with compiler_state := new_st),
-                     Conv NONE [environment_to_v merge_env; res_v])
+             then SOME (NONE, Eval next_ec)
+             else SOME (SOME fdecs, Eval next_ec)
           | _ => NONE)
        | _ => NONE)
     | flatSem$Install ic =>
       (case vs of
-       | [v1; v2] =>
-         (case (v_to_bytes v2, v_to_words v1) of
+       | [bytes_v; words_v] =>
+         (case (v_to_bytes bytes_v, v_to_words words_v) of
           | (SOME bytes, SOME data) =>
             let (st,decs) = ic.compile_oracle 0 in
             let new_oracle = shift_seq 1 ic.compile_oracle in
@@ -712,8 +706,7 @@ Definition do_eval_def:
                if bytes = bytes' ∧ data = data' ∧
                   FST(new_oracle 0) = st' ∧ decs <> [] then
                  SOME (SOME decs,
-                       Install (ic with compile_oracle := new_oracle),
-                       Unitv)
+                       Install (ic with compile_oracle := new_oracle))
                else NONE
              | _ => NONE)
           | _ => NONE)
@@ -775,35 +768,27 @@ Definition evaluate_def:
               evaluate env' (dec_clock s) [e]
           | NONE => (s, Rerr (Rabort Rtype_error)))
        else if op = flatLang$EvalSetup then
-
-       else if op = flatLang$Eval then
-         let res = (case do_pre_eval (REVERSE vs) s.eval_mode of
+         (case do_eval_setup (REVERSE vs) s.eval_mode of
            | NONE => (s, Rerr (Rabort Rtype_error))
-           | SOME NONE => (s, Rval NONE)
-           | SOME (SOME (env', x)) =>
-             if s.clock = 0 then
-               (s, Rerr (Rabort Rtimeout_error))
+           | SOME ((env', x), eval_mode) =>
+             let s' = s with <| eval_mode := eval_mode |> in
+             if s'.clock = 0 then
+               (s', Rerr (Rabort Rtimeout_error))
              else
-               case fix_clock (dec_clock s) (evaluate env' (dec_clock s) [x]) of
-                 | (s, Rval [r]) => (s, Rval (SOME r))
-                 | (s, Rerr err) => (s, Rerr err)
-                 | (s, _) => (s, Rerr (Rabort Rtype_error))
-         ) in (case res of
-           | (s, Rval r) => (case do_eval (REVERSE vs) s.eval_mode r of
-             | NONE => (s, Rerr (Rabort Rtype_error))
-             | SOME (NONE, eval_mode, retv) =>
-               (s with eval_mode := eval_mode, Rval [retv])
-             | SOME (SOME decs, eval_mode, retv) =>
-               let s = s with eval_mode := eval_mode in
-               if s.clock = 0 then
-                 (s, Rerr (Rabort Rtimeout_error))
-               else
-                 (case evaluate_decs (dec_clock s) decs of
-                    | (s, NONE) => (s, Rval [retv])
-                    | (s, SOME e) => (s, Rerr e))
-             )
-           | (s, Rerr e) => (s, Rerr e)
-           )
+               (evaluate env' (dec_clock s') [x]))
+       else if op = flatLang$Eval then
+         (case do_eval (REVERSE vs) s.eval_mode of
+           | NONE => (s, Rerr (Rabort Rtype_error))
+           | SOME (NONE, eval_mode) =>
+             (s with <| eval_mode := eval_mode |>, Rval [Unitv])
+           | SOME (SOME decs, eval_mode) =>
+             let s' = s with <| eval_mode := eval_mode |> in
+             if s'.clock = 0 then
+               (s', Rerr (Rabort Rtimeout_error))
+             else
+               (case evaluate_decs (dec_clock s') decs of
+                    | (s, NONE) => (s, Rval [Unitv])
+                    | (s, SOME e) => (s, Rerr e)))
        else
        (case (do_app s op (REVERSE vs)) of
         | NONE => (s, Rerr (Rabort Rtype_error))

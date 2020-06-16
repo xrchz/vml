@@ -650,10 +650,9 @@ val add_q = augment_srw_ss [simpLib.named_rewrites "pair_rel_thm"
   [quotient_pairTheory.PAIR_REL_THM]];
 
 Definition extend_eval_config_def:
-  extend_eval_config pat_cfg ec = Eval (ec with compile := (\env st decs.
-    let (decs, env, st) = ec.compile env st decs in
-    let decs = MAP (compile_dec pat_cfg) decs in
-    (decs, env, st)) )
+  extend_eval_config pat_cfg ec = Eval (ec
+    with flat_compiler := (\st env.
+        (MAP (compile_dec pat_cfg) ## I) o ec.flat_compiler st env))
 End
 
 Definition state_rel_def:
@@ -1432,11 +1431,13 @@ Proof
   Cases_on `x` \\ simp []
 QED
 
-Theorem v_to_environment_rel:
-  v_to_environment envv = SOME env /\ v_rel envv envv' ==>
-  v_to_environment envv' = SOME env
+Theorem v_to_nat_rel:
+  v_to_nat nv = SOME n /\ v_rel nv nv' ==>
+  v_to_nat nv' = SOME n
 Proof
-  cheat
+  simp [v_to_nat_def]
+  \\ every_case_tac
+  \\ simp [v_rel_cases]
 QED
 
 Theorem v_to_decs_rel:
@@ -1446,40 +1447,25 @@ Proof
   cheat
 QED
 
-Theorem environment_to_v_rel:
-  v_rel (environment_to_v env) (environment_to_v env)
-Proof
-  cheat
-QED
-
 Triviality v_to_list_v_rel = MATCH_MP simple_v_to_list_v_rel simple_val_rel
 
 Theorem do_eval_thm:
-  do_eval xs s.eval_mode x = SOME (decs_opt, next_ec, rv) /\
+  do_eval xs s.eval_mode = SOME (decs_opt, next_ec) /\
   state_rel s t /\
-  OPTREL v_rel x y /\
   LIST_REL v_rel xs ys ==>
-  ?decs_opt' next_ec' rv'.
-  do_eval ys t.eval_mode y = SOME (decs_opt', next_ec', rv') /\
-  v_rel rv rv' /\
+  ?decs_opt' next_ec'.
+  do_eval ys t.eval_mode = SOME (decs_opt', next_ec') /\
   state_rel (s with eval_mode := next_ec) (t with eval_mode := next_ec') /\
   OPTREL (\decs decs'. ?cfg'. decs' = MAP (compile_dec cfg') decs)
     decs_opt decs_opt'
-
-
 Proof
-
   rw [state_rel_def]
-  \\ fs [Q.SPECL [`vs`, `Eval _`] do_eval_def, case_eq_thms, pair_case_eq]
+  \\ fs [do_eval_def, case_eq_thms, pair_case_eq, extend_eval_config_def]
   \\ rveq \\ fs []
-  \\ fs [OPTREL_SOME, v_rel_l_cases]
   \\ rveq \\ fs []
-  \\ rpt (pairarg_tac \\ fs [])
-  \\ drule_then drule v_to_environment_rel
-  \\ drule_then drule v_to_decs_rel
   \\ rpt (dxrule_then drule v_to_list_v_rel)
-  \\ rw []
-  \\ simp [do_eval_def, extend_eval_config_def]
+  \\ rw [] \\ simp []
+  \\ rpt (pairarg_tac \\ fs [])
   \\ fs [bool_case_eq] \\ imp_res_tac NULL_EQ \\ rveq \\ fs []
   >- (
     simp [OPTREL_def, v_rel_l_cases]
@@ -1487,44 +1473,33 @@ Proof
   )
   \\ drule_then drule (Q.prove (`LIST_REL P xs ys /\ ~ NULL xs ==> ~ NULL ys`,
     rpt strip_tac \\ fs [NULL_EQ]))
-  \\ simp [v_rel_l_cases, OPTREL_SOME, environment_to_v_rel]
+  \\ simp [v_rel_l_cases, OPTREL_SOME]
   \\ metis_tac []
-
-(*
-  \\ simp [PULL_EXISTS, v_rel_l_cases]
-  \\ rpt (disch_then drule)
-  \\ rw []
-  \\ simp [extend_eval_config_def]
-  \\ drule_then drule v_to_environment_rel
-  \\ drule_then drule v_to_decs_rel
-  \\ rw []
-  \\ goal_assum (first_assum o mp_then (Pat `compile_exp _ _ = _`) mp_tac)
-  \\ rpt (qexists_tac `st`)
-  \\ simp [environment_to_v_rel]
-  \\ rpt (qexists_tac `st`)
-  \\ simp []
-*)
 QED
 
-Theorem do_pre_eval_thm:
-  do_pre_eval xs s.eval_mode = SOME r /\
+Theorem do_eval_setup_thm:
+  do_eval_setup xs s.eval_mode = SOME r /\
   state_rel s t /\
   LIST_REL v_rel xs ys ==>
-  ? env x env' x' i cfg sg. r = SOME (env, x) /\
-  do_pre_eval ys t.eval_mode = SOME (SOME (env', x')) /\
+  ? env x em env' x' em' i cfg sg. r = ((env, x), em) /\
+  do_eval_setup ys t.eval_mode = SOME ((env', x'), em') /\
     compile_exp cfg x = (i, sg, x') /\
-    env_rel (i + 1) env env'
+    env_rel (i + 1) env env' /\
+    state_rel (s with eval_mode := em) (t with eval_mode := em')
 Proof
-  rw [do_pre_eval_def, state_rel_def, extend_eval_config_def]
+  rw [do_eval_setup_def, state_rel_def, extend_eval_config_def]
   \\ fs [CaseEq "v", list_case_eq, option_case_eq]
   \\ rveq \\ fs []
   \\ rveq \\ fs []
-  \\ Cases_on `r'`
+  \\ PairCases_on `r'`
   \\ drule do_opapp_thm
   \\ simp [PULL_EXISTS, v_rel_l_cases]
   \\ rpt (disch_then drule)
   \\ rw []
   \\ simp []
+  \\ drule_then drule v_to_decs_rel
+  \\ drule_then drule v_to_nat_rel
+  \\ rw [] \\ simp []
   \\ metis_tac []
 QED
 
@@ -1701,49 +1676,55 @@ Proof
       \\ simp [EVAL ``(dec_clock s).c``]
       \\ metis_tac [EVERY_REVERSE]
     )
+    \\ Cases_on `op = EvalSetup`
+    >- (
+      fs [option_case_eq, pair_case_eq]
+      \\ rveq \\ fs []
+      \\ drule (do_eval_setup_thm |> Q.INST [`ys` |-> `REVERSE rys`])
+      \\ simp []
+      \\ rpt (disch_then drule)
+      \\ rw []
+      \\ imp_res_tac state_rel_IMP_clock
+      \\ fs [bool_case_eq]
+      \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ]
+      \\ imp_res_tac state_rel_dec_clock
+      \\ last_x_assum drule
+      \\ rpt (disch_then drule)
+      \\ simp [EVAL ``(dec_clock s).c``]
+    )
     \\ Cases_on `op = Eval`
     >- (
       fs [option_case_eq]
       \\ fs [pair_case_eq]
-      \\ rveq \\ fs []
-      \\ fs [Q.GEN `opt` option_case_eq |> Q.ISPEC `do_pre_eval _ _`]
-      \\ rveq \\ fs []
-      \\ drule (do_pre_eval_thm |> Q.INST [`ys` |-> `REVERSE rys`])
+      \\ rveq
+      \\ drule (do_eval_thm |> Q.INST [`ys` |-> `REVERSE rys`])
       \\ simp []
       \\ rpt (disch_then drule)
-      \\ rpt strip_tac \\ fs []
+      \\ rw []
+      \\ fs [option_case_eq]
+      >- (
+        (* no decs to evaluate *)
+        rveq \\ fs []
+        \\ fs [OPTREL_def]
+        \\ simp [v_rel_l_cases, Unitv_def]
+      )
       \\ rveq \\ fs []
+      \\ fs [OPTREL_def]
       \\ imp_res_tac state_rel_IMP_clock
       \\ fs [bool_case_eq]
+      \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ]
+      \\ fs [pair_case_eq]
       \\ rveq \\ fs []
-      \\ rveq \\ fs []
-      \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
-      \\ drule_then assume_tac state_rel_dec_clock
-      \\ last_x_assum drule
-      \\ rpt (disch_then drule)
-      \\ simp [EVAL ``(dec_clock s).c``]
+      \\ rfs []
+      \\ imp_res_tac state_rel_dec_clock
+      \\ first_x_assum drule
+      \\ simp [EVAL ``(dec_clock s).c``, GSYM PULL_FORALL]
       \\ impl_tac >- (strip_tac \\ fs [] \\ rveq \\ fs [])
+      \\ disch_then (qspec_then `cfg'` mp_tac)
       \\ rw []
-      \\ fs [result_case_eq, list_case_eq, pair_case_eq]
-      \\ rveq \\ fs [] \\ rveq \\ fs []
-      \\ fs [option_case_eq]
-      \\ fs [pair_case_eq] \\ rveq \\ fs []
-      \\ rpt (disch_then drule)
-      \\ rw []
-      \\ drule_then drule (Q.INST [`ys` |-> `REVERSE rys`] do_eval_thm)
-      \\ simp [OPTREL_SOME, PULL_EXISTS]
-      \\ rpt (disch_then drule)
-      \\ rw [] \\ fs []
-      \\ imp_res_tac state_rel_IMP_clock
-      \\ fs [OPTREL_def] \\ fs [] \\ rveq \\ fs []
-      \\ fs [bool_case_eq, v_rel_rules]
-      \\ fs [Q.ISPEC `(a, b)` EQ_SYM_EQ, pair_case_eq]
-      \\ drule_then assume_tac state_rel_dec_clock
-      \\ last_x_assum (drule_then drule)
-      \\ simp [EVAL ``(dec_clock s).c``]
-      \\ disch_then (qspec_then `cfg''` mp_tac)
-      \\ impl_tac >- (strip_tac \\ fs [])
-      \\ rw [] \\ fs [] \\ rveq \\ fs []
+      \\ fs []
+      \\ rveq \\ fs []
+      \\ simp [Unitv_def, v_rel_l_cases]
     )
     \\ fs [option_case_eq, pair_case_eq]
     \\ rveq \\ fs []
@@ -1898,7 +1879,9 @@ Proof
 QED
 
 Theorem compile_decs_eval_sim:
-  eval_sim ffi prog prog' (Eval ec) (extend_eval_config cfg1 ec)
+  eval_sim ffi prog prog'
+    (Eval ec : 'c eval_config)
+    (extend_eval_config cfg1 ec : 'c eval_config)
     (\decs decs'. MAP (compile_dec cfg2) decs = decs') F
 Proof
   simp [eval_sim_def]
@@ -1918,10 +1901,11 @@ Proof
 QED
 
 Theorem compile_decs_semantics:
-  semantics (Eval ec) ffi prog <> Fail
+  semantics (Eval ec : 'c eval_config) ffi prog <> Fail
   ==>
-  semantics (Eval ec) ffi prog =
-  semantics (extend_eval_config cfg2 ec) ffi (MAP (compile_dec cfg1) prog)
+  semantics (Eval ec : 'c eval_config) ffi prog =
+  semantics (extend_eval_config cfg2 ec : 'c eval_config) ffi
+    (MAP (compile_dec cfg1) prog)
 Proof
   rw []
   \\ irule (DISCH_ALL (MATCH_MP (hd (RES_CANON IMP_semantics_eq))
